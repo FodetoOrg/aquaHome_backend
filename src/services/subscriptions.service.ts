@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { eq, and, or, like, desc, count } from 'drizzle-orm';
-import { subscriptions, users, products, installationRequests, franchises, payments } from '../models/schema';
+import { subscriptions, users, products, installationRequests, franchises, payments, cancelSubscriptionRequests } from '../models/schema';
 import { RentalStatus, UserRole, InstallationRequestStatus, PaymentType, PaymentStatus, ActionType } from '../types';
 import { generateId, parseJsonSafe } from '../utils/helpers';
 import { notFound, badRequest, forbidden } from '../utils/errors';
@@ -74,7 +74,7 @@ export async function createSubscription(data: {
   });
 
   if (!installationRequest) throw notFound('Installation Request');
-  
+
   // Check if installation is completed
   if (installationRequest.status !== InstallationRequestStatus.INSTALLATION_COMPLETED) {
     throw badRequest('Installation must be completed before creating subscription');
@@ -133,7 +133,7 @@ export async function createSubscription(data: {
         plan_id: razorpayPlan.id,
         customer_notify: 1,
         quantity: 1,
-        total_count: data.endDate ?  12  : 240, // 20 years if no end date
+        total_count: data.endDate ? 12 : 240, // 20 years if no end date
         start_at: Math.floor(nextPaymentDate.getTime() / 1000), // Start from next payment date
         addons: [],
         notes: {
@@ -242,14 +242,14 @@ export async function createSubscription(data: {
 // Check subscription by connect ID
 export async function checkSubscriptionByConnectId(connectId: string, customerPhone: string) {
   const fastify = getFastifyInstance();
-  
+
   const subscription = await fastify.db.query.subscriptions.findFirst({
     where: eq(subscriptions.connectId, connectId.toUpperCase()),
     with: {
       customer: true,
       product: true,
       franchise: true,
-      serviceRequests:true
+      serviceRequests: true
 
     },
   });
@@ -381,6 +381,7 @@ export async function getSubscriptionById(id: string) {
       product: true,
       franchise: true,
       installationRequest: true,
+      payments: true
     },
   });
 
@@ -596,20 +597,7 @@ export async function terminateSubscription(id: string, user: any, options: { re
     updatedAt: new Date().toISOString(),
   }).where(eq(subscriptions.id, id));
 
-  // Handle deposit refund if requested
-  if (options.refundDeposit && subscription.depositAmount > 0) {
-    const refundPaymentId = await generateId('pay');
-    await fastify.db.insert(payments).values({
-      id: refundPaymentId,
-      subscriptionId: id,
-      amount: subscription.depositAmount,
-      type: PaymentType.DEPOSIT,
-      status: PaymentStatus.PENDING,
-      paymentMethod: 'REFUND',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-  }
+
 
   // Log action history
   await logActionHistory({
@@ -628,4 +616,30 @@ export async function terminateSubscription(id: string, user: any, options: { re
   // TODO: Create uninstallation service request
 
   return await getSubscriptionById(id);
+}
+
+
+export async function cancelSubRequest(user: any, id: string, reason: string) {
+  const db = getFastifyInstance().db
+  const sub = await db.query.subscriptions.findFirst({
+    where: eq(subscriptions.id, id)
+  })
+
+  if (!sub) {
+    throw notFound('subscription')
+  }
+
+  if (sub.customerId !== user.userId) {
+    throw badRequest("You don't have access to raise request 2")
+  }
+
+
+
+  await db.insert(cancelSubscriptionRequests).values({
+    id: await generateId('cancel_sub'),
+    subcriptionId: sub.id,
+    reason: reason
+  })
+
+
 }

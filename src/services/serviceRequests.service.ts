@@ -249,9 +249,11 @@ export async function createServiceRequest(data: any, user: any) {
     { type: data.type, requiresPayment: data.requiresPayment }
   ));
 
+
+
   // Send push notifications for non-installation service requests
   const createdServiceRequest = await getServiceRequestById(id);
-  if (createdServiceRequest && createdServiceRequest.installationRequestId) {
+  if (createdServiceRequest) {
     await sendServiceRequestNotifications(createdServiceRequest, 'created', user);
   }
 
@@ -421,7 +423,7 @@ export async function updateServiceRequestStatus(
   // Define valid status transitions
   const validTransitions: Record<ServiceRequestStatus, ServiceRequestStatus[]> = {
     [ServiceRequestStatus.CREATED]: [ServiceRequestStatus.ASSIGNED, ServiceRequestStatus.CANCELLED],
-    [ServiceRequestStatus.ASSIGNED]: [ServiceRequestStatus.SCHEDULED, ServiceRequestStatus.CANCELLED],
+    [ServiceRequestStatus.ASSIGNED]: [ServiceRequestStatus.SCHEDULED, ServiceRequestStatus.CANCELLED, ServiceRequestStatus.ASSIGNED],
     [ServiceRequestStatus.SCHEDULED]: [ServiceRequestStatus.IN_PROGRESS, ServiceRequestStatus.CANCELLED],
     [ServiceRequestStatus.IN_PROGRESS]: [ServiceRequestStatus.PAYMENT_PENDING, ServiceRequestStatus.COMPLETED, ServiceRequestStatus.CANCELLED],
     [ServiceRequestStatus.PAYMENT_PENDING]: [ServiceRequestStatus.COMPLETED, ServiceRequestStatus.CANCELLED],
@@ -484,11 +486,13 @@ export async function updateServiceRequestStatus(
         throw badRequest('Service requests requiring payment must go through PAYMENT_PENDING status first');
       }
 
-      const paymnet = await db.query.payments.findFirst({
-        where: eq(payments.installationRequestId, serviceRequest.installationRequestId)
-      })
-      if (!paymnet || paymnet.status !== PaymentStatus.COMPLETED || paymnet.installationRequestId !== serviceRequest.installationRequestId) {
-        throw badRequest('Please Complete Payment First');
+      if (serviceRequest.requiresPayment && serviceRequest.installationRequestId) {
+        const paymnet = await db.query.payments.findFirst({
+          where: eq(payments.installationRequestId, serviceRequest.installationRequestId)
+        })
+        if (!paymnet || paymnet.status !== PaymentStatus.COMPLETED || paymnet.installationRequestId !== serviceRequest.installationRequestId) {
+          throw badRequest('Please Complete Payment First');
+        }
       }
       break;
     case ServiceRequestStatus.CANCELLED:
@@ -500,7 +504,7 @@ export async function updateServiceRequestStatus(
   }
 
   // Add specific data based on status
-  if (data?.agentId) updateData.assignedAgentId = data.agentId;
+  if (data?.agentId) updateData.assignedToId = data.agentId;
   if (data?.scheduledDate) updateData.scheduledDate = data.scheduledDate;
   if (status === ServiceRequestStatus.COMPLETED) updateData.completedAt = new Date().toISOString();
 
@@ -563,96 +567,6 @@ export async function updateServiceRequestStatus(
   });
 }
 
-// Validate service request status transitions and image requirements
-async function validateServiceRequestTransition(
-  sr: any,
-  newStatus: ServiceRequestStatus,
-  images?: { beforeImages?: string[]; afterImages?: string[] }
-) {
-  const currentStatus = sr.status;
-
-  // Validation for SCHEDULED -> IN_PROGRESS transition (requires before images for non-installation types)
-  if (currentStatus === ServiceRequestStatus.SCHEDULED && newStatus === ServiceRequestStatus.IN_PROGRESS) {
-    console.log('came here ', sr)
-    if (sr.type !== ServiceRequestType.INSTALLATION) {
-      console.log('camer here beforeImages ', images.beforeImages)
-      if (!images?.beforeImages || images.beforeImages.length === 0) {
-        throw badRequest('Before images are required when starting service work');
-      }
-    }
-  }
-
-  // Validation for IN_PROGRESS -> PAYMENT_PENDING transition
-  if (currentStatus === ServiceRequestStatus.IN_PROGRESS && newStatus === ServiceRequestStatus.PAYMENT_PENDING) {
-    if (!sr.requirePayment) {
-      throw badRequest('This service request does not require payment');
-    }
-
-    // Require after images for payment pending
-    if (!images?.afterImages || images.afterImages.length === 0) {
-      throw badRequest('After images are required before moving to payment pending');
-    }
-  }
-
-  // Validation for IN_PROGRESS -> COMPLETED transition (for non-payment services)
-  if (currentStatus === ServiceRequestStatus.IN_PROGRESS && newStatus === ServiceRequestStatus.COMPLETED) {
-    if (sr.requirePayment) {
-      throw badRequest('Service requests requiring payment must go through PAYMENT_PENDING status first');
-    }
-
-    // Require after images for completion
-    if (!images?.afterImages || images.afterImages.length === 0) {
-      throw badRequest('After images are required when completing service work');
-    }
-  }
-
-  // Validation for PAYMENT_PENDING -> COMPLETED transition
-  if (currentStatus === ServiceRequestStatus.PAYMENT_PENDING && newStatus === ServiceRequestStatus.COMPLETED) {
-    // This transition is allowed once payment is verified
-    // Payment verification should be handled separately
-  }
-
-  // Special validation for installation service requests
-  if (sr.type === ServiceRequestType.INSTALLATION) {
-    await validateInstallationSpecificTransitions(sr, currentStatus, newStatus, images);
-  }
-}
-
-// Additional validation specific to installation service requests
-async function validateInstallationSpecificTransitions(
-  sr: any,
-  currentStatus: ServiceRequestStatus,
-  newStatus: ServiceRequestStatus,
-  images?: { beforeImages?: string[]; afterImages?: string[] }
-) {
-  const fastify = getFastifyInstance();
-  // Installation requests always require payment, so enforce payment flow
-  if (currentStatus === ServiceRequestStatus.IN_PROGRESS && newStatus === ServiceRequestStatus.COMPLETED) {
-    throw badRequest('Installation service requests must go through PAYMENT_PENDING status before completion');
-  }
-
-  // Installation completion requires after images
-  if (currentStatus === ServiceRequestStatus.IN_PROGRESS && newStatus === ServiceRequestStatus.PAYMENT_PENDING) {
-    if (!images?.afterImages || images.afterImages.length === 0) {
-      throw badRequest('Installation completion images are required before moving to payment pending');
-    }
-  }
-
-  // Installation can only be completed after payment verification
-  if (currentStatus === ServiceRequestStatus.PAYMENT_PENDING && newStatus === ServiceRequestStatus.COMPLETED) {
-    // Additional payment verification logic can be added here if needed
-    const installationPayment = await fastify.db.query.payments.findFirst({
-      where: and(eq(payments.installationRequestId, sr.installationRequestId), eq(payments.status, PaymentStatus.COMPLETED))
-
-    });
-
-    if (!installationPayment) {
-      throw badRequest('please complete payment first')
-
-    }
-
-  }
-}
 
 // Sync installation request status based on service request status
 
@@ -664,53 +578,6 @@ async function validateInstallationSpecificTransitions(
 // Schedule service request
 
 
-
-async function syncInstallationRequestStatus(
-  installationRequestId: string,
-  serviceRequestStatus: ServiceRequestStatus,
-  user: any
-) {
-  const fastify = getFastifyInstance();
-
-  let installationStatus: InstallationRequestStatus | null = null;
-  let installationActionType: ActionType | null = null;
-
-  switch (serviceRequestStatus) {
-    case ServiceRequestStatus.IN_PROGRESS:
-      installationStatus = InstallationRequestStatus.INSTALLATION_IN_PROGRESS;
-      installationActionType = ActionType.INSTALLATION_REQUEST_IN_PROGRESS;
-      break;
-    case ServiceRequestStatus.PAYMENT_PENDING:
-      installationStatus = InstallationRequestStatus.PAYMENT_PENDING;
-      installationActionType = ActionType.INSTALLATION_REQUEST_COMPLETED;
-      break;
-    case ServiceRequestStatus.COMPLETED:
-      installationStatus = InstallationRequestStatus.INSTALLATION_COMPLETED;
-      installationActionType = ActionType.INSTALLATION_REQUEST_COMPLETED;
-      break;
-    case ServiceRequestStatus.CANCELLED:
-      installationStatus = InstallationRequestStatus.CANCELLED;
-      installationActionType = ActionType.INSTALLATION_REQUEST_CANCELLED;
-      break;
-    case ServiceRequestStatus.SCHEDULED:
-      installationStatus = InstallationRequestStatus.INSTALLATION_SCHEDULED;
-      installationActionType = ActionType.INSTALLATION_REQUEST_SCHEDULED;
-      break;
-  }
-  await fastify.db.update(installationRequests).set({
-    status: installationStatus
-  }).where(eq(installationRequests.id, installationRequestId))
-
-  await logActionHistory({
-    installationRequestId: installationRequestId,
-    actionType: installationActionType,
-    fromStatus: serviceRequestStatus,
-    toStatus: ServiceRequestStatus.ASSIGNED,
-    performedBy: user.userId,
-    performedByRole: user.role,
-    comment: `Service agent ${user.name || user.phone} assigned`
-  })
-}
 
 // Transaction-aware version of syncInstallationRequestStatus
 async function syncInstallationRequestStatusInTransaction(
@@ -1326,7 +1193,7 @@ export async function refreshPaymentStatus(serviceRequestId: string, user: any) 
         }
 
         // Create or update payment record
-        const paymentId = existingPayment?.id ||await  generateId('payment');
+        const paymentId = existingPayment?.id || await generateId('payment');
         const now = new Date().toISOString();
 
         if (existingPayment) {
@@ -1347,7 +1214,7 @@ export async function refreshPaymentStatus(serviceRequestId: string, user: any) 
           await tx.insert(payments).values({
             id: paymentId,
             installationRequestId: serviceRequest.installationRequestId,
-            amount: successfulPayment.amount/100,
+            amount: successfulPayment.amount / 100,
             type: PaymentType.SUBSCRIPTION,
             status: PaymentStatus.COMPLETED,
             paymentMethod: successfulPayment.method,
@@ -1372,7 +1239,7 @@ export async function refreshPaymentStatus(serviceRequestId: string, user: any) 
 
           if (installationRequest) {
             const connectId = generateConnectId();
-            const subscriptionId =await  generateId('sub');
+            const subscriptionId = await generateId('sub');
 
             await tx.insert(subscriptions).values({
               id: subscriptionId,

@@ -3,10 +3,11 @@ import * as subscriptionService from '../services/subscriptions.service';
 import { handleError, notFound, badRequest, forbidden } from '../utils/errors';
 import { UserRole } from '../types';
 
+
 // Create a new subscription
 export async function createSubscription(
-  request: FastifyRequest<{ 
-    Body: { 
+  request: FastifyRequest<{
+    Body: {
       installationRequestId: string;
       planName: string;
       monthlyAmount: number;
@@ -14,7 +15,7 @@ export async function createSubscription(
       startDate?: string;
       endDate?: string;
       enableAutoPayment?: boolean;
-    } 
+    }
   }>,
   reply: FastifyReply
 ) {
@@ -30,8 +31,8 @@ export async function createSubscription(
     console.log('Creating subscription with data:', subscriptionData);
 
     const result = await subscriptionService.createSubscription(subscriptionData, user);
-    return reply.code(201).send({ 
-      message: 'Subscription created successfully', 
+    return reply.code(201).send({
+      message: 'Subscription created successfully',
       subscription: result.subscription,
       razorpayOrder: result.razorpayOrder
     });
@@ -43,11 +44,11 @@ export async function createSubscription(
 
 // Check subscription by connect ID
 export async function checkSubscription(
-  request: FastifyRequest<{ 
-    Body: { 
+  request: FastifyRequest<{
+    Body: {
       connectId: string;
       customerPhone: string;
-    } 
+    }
   }>,
   reply: FastifyReply
 ) {
@@ -57,7 +58,7 @@ export async function checkSubscription(
     console.log('Checking subscription for connect ID:', connectId);
 
     const result = await subscriptionService.checkSubscriptionByConnectId(connectId, customerPhone);
-    console.log('result ',result)
+    console.log('result ', result)
     return reply.code(200).send(result);
   } catch (error) {
     console.error('Error checking subscription:', error);
@@ -91,16 +92,16 @@ export async function getSubscriptionById(
   try {
     const { id } = request.params;
     const user = request.user;
-    
+
     const subscription = await subscriptionService.getSubscriptionById(id);
     if (!subscription) throw notFound('Subscription');
 
     console.log('subscription:', subscription);
     console.log('user:', user);
-    
+
     // Permission: admin, franchise owner (owns franchise), or customer (owns subscription)
     let hasPermission = false;
-    
+
     if (user.role === UserRole.ADMIN) {
       hasPermission = true;
     } else if (user.role === UserRole.CUSTOMER && subscription.customerId === user.userId) {
@@ -109,9 +110,9 @@ export async function getSubscriptionById(
       const franchise = await subscriptionService.getFranchiseById(subscription.franchiseId);
       hasPermission = franchise && franchise.ownerId === user.userId;
     }
-    
+
     if (!hasPermission) throw forbidden('You do not have permission to view this subscription');
-    
+
     return reply.code(200).send({ subscription });
   } catch (error) {
     handleError(error, request, reply);
@@ -120,16 +121,16 @@ export async function getSubscriptionById(
 
 // Update subscription
 export async function updateSubscription(
-  request: FastifyRequest<{ 
+  request: FastifyRequest<{
     Params: { id: string };
-    Body: { 
+    Body: {
       status?: string;
       planName?: string;
       monthlyAmount?: number;
       endDate?: string;
       nextPaymentDate?: string;
       reason?: string;
-    } 
+    }
   }>,
   reply: FastifyReply
 ) {
@@ -141,9 +142,9 @@ export async function updateSubscription(
     console.log('Updating subscription:', id, 'with data:', updateData);
 
     const subscription = await subscriptionService.updateSubscription(id, updateData, user);
-    return reply.code(200).send({ 
-      message: 'Subscription updated successfully', 
-      subscription 
+    return reply.code(200).send({
+      message: 'Subscription updated successfully',
+      subscription
     });
   } catch (error) {
     handleError(error, request, reply);
@@ -152,12 +153,12 @@ export async function updateSubscription(
 
 // Pause subscription
 export async function pauseSubscription(
-  request: FastifyRequest<{ 
+  request: FastifyRequest<{
     Params: { id: string };
-    Body: { 
+    Body: {
       reason?: string;
       pauseDuration?: number;
-    } 
+    }
   }>,
   reply: FastifyReply
 ) {
@@ -169,9 +170,9 @@ export async function pauseSubscription(
     console.log('Pausing subscription:', id);
 
     const subscription = await subscriptionService.pauseSubscription(id, user, { reason, pauseDuration });
-    return reply.code(200).send({ 
-      message: 'Subscription paused successfully', 
-      subscription 
+    return reply.code(200).send({
+      message: 'Subscription paused successfully',
+      subscription
     });
   } catch (error) {
     handleError(error, request, reply);
@@ -190,23 +191,25 @@ export async function resumeSubscription(
     console.log('Resuming subscription:', id);
 
     const subscription = await subscriptionService.resumeSubscription(id, user);
-    return reply.code(200).send({ 
-      message: 'Subscription resumed successfully', 
-      subscription 
+    return reply.code(200).send({
+      message: 'Subscription resumed successfully',
+      subscription
     });
   } catch (error) {
     handleError(error, request, reply);
   }
 }
 
+
+
 // Terminate subscription
 export async function terminateSubscription(
-  request: FastifyRequest<{ 
+  request: FastifyRequest<{
     Params: { id: string };
-    Body: { 
+    Body: {
       reason: string;
       refundDeposit?: boolean;
-    } 
+    }
   }>,
   reply: FastifyReply
 ) {
@@ -218,11 +221,39 @@ export async function terminateSubscription(
     console.log('Terminating subscription:', id);
 
     const subscription = await subscriptionService.terminateSubscription(id, user, { reason, refundDeposit });
-    return reply.code(200).send({ 
-      message: 'Subscription terminated successfully', 
-      subscription 
+    return reply.code(200).send({
+      message: 'Subscription terminated successfully',
+      subscription
     });
   } catch (error) {
     handleError(error, request, reply);
   }
 }
+
+export async function cancelRequest(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    const user = request.user;
+
+
+    if (user.role !== UserRole.CUSTOMER) {
+      throw badRequest('You dont have access to raise cancel request 1')
+    }
+    const { id } = request.params
+    const { reason }= request.body
+
+    if (!reason) {
+      throw badRequest('please provide reason')
+    }
+
+    await subscriptionService.cancelSubRequest(user, id, reason)
+
+    return reply.code(200).send({
+      message: 'requested sucessfully',
+
+    })
+
+  } catch (error) {
+    handleError(error, request, reply);
+  }
+
+} 

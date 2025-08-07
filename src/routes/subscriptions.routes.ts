@@ -8,10 +8,10 @@ import {
   pauseSubscription,
   resumeSubscription,
   terminateSubscription,
+  cancelRequest,
 } from '../controllers/subscriptions.controller';
 import {
   createSubscriptionSchema,
-  checkSubscriptionSchema,
   getAllSubscriptionsSchema,
   getSubscriptionByIdSchema,
   updateSubscriptionSchema,
@@ -45,7 +45,7 @@ export default async function (fastify: FastifyInstance) {
   fastify.get(
     '/',
     {
-      schema: getAllSubscriptionsSchema,
+      // schema: getAllSubscriptionsSchema,
       preHandler: [fastify.authenticate],
     },
     (request, reply) => getAllSubscriptions(request as any, reply as any)
@@ -55,7 +55,7 @@ export default async function (fastify: FastifyInstance) {
   fastify.get(
     '/:id',
     {
-      schema: getSubscriptionByIdSchema,
+      // schema: getSubscriptionByIdSchema,
       preHandler: [fastify.authenticate],
     },
     (request, reply) => getSubscriptionById(request as any, reply as any)
@@ -100,6 +100,19 @@ export default async function (fastify: FastifyInstance) {
     },
     (request, reply) => terminateSubscription(request as any, reply as any)
   );
+  // Terminate subscription (admin, franchise owner only)
+  fastify.post(
+    '/cancelRequest/:id',
+    {
+      // schema: terminateSubscriptionSchema,
+      preHandler: [fastify.authenticate, fastify.authorizeRoles([UserRole.CUSTOMER])],
+    },
+    (request, reply) => cancelRequest(request as any, reply as any)
+  );
+
+
+
 
   fastify.log.info('Subscription routes registered');
 }
+

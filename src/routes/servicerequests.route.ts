@@ -12,9 +12,7 @@ import {
 } from '../controllers/serviceRequests.controller';
 import {
   getAllServiceRequestsSchema,
-  getServiceRequestByIdSchema,
   createInstallationServiceRequestSchema,
-  updateServiceRequestStatusSchema,
   assignServiceAgentSchema,
   scheduleServiceRequestSchema,
 } from '../schemas/servicerequests.schema';
@@ -26,10 +24,9 @@ import {
 
 // Import Expo and ExpoPushMessage types
 import Expo from 'expo-server-sdk';
-import { ExpoPushMessage, ExpoPushTicket } from 'expo-server-sdk';
 
-// Create an Expo instance
-const expo = new Expo();
+
+
 
 export default async function (fastify: FastifyInstance) {
   // Get all service requests (admin, franchise owner, service agent, customer)

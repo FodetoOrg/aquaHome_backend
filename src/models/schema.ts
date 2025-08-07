@@ -122,6 +122,14 @@ export const subscriptions = sqliteTable("subscriptions", {
     updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
 });
 
+export const cancelSubscriptionRequests = sqliteTable('cancelSubscriptionRequests', {
+    id: text('id').primaryKey(),
+    subcriptionId: text('subscription_id').notNull().references(() => subscriptions.id),
+    reason: text('reason').notNull(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+})
+
 export const serviceRequests = sqliteTable("service_requests", {
     id: text("id").primaryKey(),
     subscriptionId: text("subscription_id").references(() => subscriptions.id), // ONLY for rental customers (can be NULL)
@@ -141,7 +149,8 @@ export const serviceRequests = sqliteTable("service_requests", {
     beforeImages: text("before_images"), // JSON array - agent uploads before service
     afterImages: text("after_images"), // JSON array - agent uploads after service
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
-    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    cancelReason: text('canel_reason')
 });
 
 // NEW: Payments table for rental subscriptions and service charges
