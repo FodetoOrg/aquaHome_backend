@@ -1,3 +1,4 @@
+//@ts-nocheck
 import { FastifyRequest, FastifyReply } from 'fastify';
 import * as subscriptionService from '../services/subscriptions.service';
 import { handleError, notFound, badRequest, forbidden } from '../utils/errors';

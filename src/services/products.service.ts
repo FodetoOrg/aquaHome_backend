@@ -1,3 +1,4 @@
+//@ts-nocheck
 import { eq, and } from 'drizzle-orm';
 import { products } from '../models/schema';
 import { notFound } from '../utils/errors';

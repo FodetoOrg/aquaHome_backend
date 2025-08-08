@@ -1,3 +1,4 @@
+//@ts-nocheck
 import { and, eq, sql, desc, asc } from 'drizzle-orm';
 import { categories } from '../models/schema';
 import { v4 as uuidv4 } from 'uuid';

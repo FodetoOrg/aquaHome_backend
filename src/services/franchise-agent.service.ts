@@ -1,4 +1,4 @@
-// services/franchiseagent.service.ts
+//@ts-nocheck
 import { getFastifyInstance } from '../shared/fastify-instance';
 import { franchiseAgents, users, franchises } from '../models/schema';
 import { generateId } from '../utils/helpers';

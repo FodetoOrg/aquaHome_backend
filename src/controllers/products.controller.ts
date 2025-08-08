@@ -57,7 +57,7 @@ export async function createProduct(request: FastifyRequest, reply: FastifyReply
           chunks.push(chunk);
         }
         const buffer = Buffer.concat(chunks);
-        const uploadedUrl = await request.server.uploadToS3(buffer, filename, part.mimetype);
+        const uploadedUrl = await request.server.uploadToStorage(buffer, filename, part.mimetype);
         images.push(uploadedUrl);
       } else {
         // This is a regular field
@@ -118,7 +118,7 @@ export async function updateProduct(
           chunks.push(chunk);
         }
         const buffer = Buffer.concat(chunks);
-        const uploadedUrl = await request.server.uploadToS3(buffer, filename, part.mimetype);
+        const uploadedUrl = await request.server.uploadToStorage(buffer, filename, part.mimetype);
         images.push(uploadedUrl);
       } else {
         // This is a regular field
@@ -210,7 +210,7 @@ export async function uploadProductImage(
     // Upload to S3
     const buffer = await file.toBuffer();
     const filename = `products/${id}/${Date.now()}_${file.filename}`;
-    const imageUrl = await request.server.uploadToS3(buffer, filename, mimetype);
+    const imageUrl = await request.server.uploadToStorage(buffer, filename, mimetype);
 
     // Add the image to the product
     const product = await productService.getProductById(id);

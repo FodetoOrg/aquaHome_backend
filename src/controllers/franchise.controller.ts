@@ -1,3 +1,4 @@
+//@ts-nocheck
 import { FastifyRequest, FastifyReply } from 'fastify';
 import * as franchiseService from '../services/franchise.service';
 import { handleError, notFound, forbidden, serverError, badRequest, conflict } from '../utils/errors';

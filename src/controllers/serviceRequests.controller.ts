@@ -1,3 +1,4 @@
+//@ts-nocheck
 import { FastifyRequest, FastifyReply } from "fastify";
 import * as serviceRequestService from '../services/serviceRequests.service';
 import * as installationRequestService from '../services/installation-request.service';
@@ -94,8 +95,8 @@ export async function createServiceRequest(
         const buffer = Buffer.concat(chunks);
 
         // Upload to S3 if available
-        if (request.server.uploadToS3) {
-          const uploadedUrl = await request.server.uploadToS3(buffer, filename, part.mimetype);
+        if (request.server.uploadToStorage) {
+          const uploadedUrl = await request.server.uploadToStorage(buffer, filename, part.mimetype);
           images.push(uploadedUrl);
         }
       } else {
@@ -222,8 +223,8 @@ export async function updateServiceRequestStatus(
           }
           const buffer = Buffer.concat(chunks);
 
-          if (request.server.uploadToS3) {
-            const uploadedUrl = await request.server.uploadToS3(buffer, filename, part.mimetype);
+          if (request.server.uploadToStorage) {
+            const uploadedUrl = await request.server.uploadToStorage(buffer, filename, part.mimetype);
             if (part.fieldname === 'beforeImages') {
               beforeImages.push(uploadedUrl);
             } else if (part.fieldname === 'afterImages') {

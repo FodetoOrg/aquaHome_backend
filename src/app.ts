@@ -10,7 +10,7 @@ import * as dotenv from 'dotenv';
 import dbPlugin from './plugins/db';
 import authPlugin from './plugins/auth';
 import razorpayPlugin from './plugins/razorpay';
-import s3Plugin from './plugins/s3';
+// import s3Plugin from './plugins/s3';
 import firebasePlugin from './plugins/firebase';
 // import sesPlugin from './plugins/ses';
 // import whatsappPlugin from './plugins/whatsapp';
@@ -83,7 +83,7 @@ app.register(firebasePlugin);
 // app.register(sesPlugin);
 // app.register(whatsappPlugin);
 app.register(razorpayPlugin);
-app.register(s3Plugin);
+// app.register(s3Plugin);
 
 // Register Swagger AFTER multipart
 app.register(swagger, {

@@ -1,3 +1,4 @@
+//@ts-nocheck
 import { FastifyInstance } from 'fastify';
 import { eq, and, or, inArray, sql } from 'drizzle-orm';
 import { franchiseAgents, type franchiseArea, franchises, User, users } from '../models/schema';

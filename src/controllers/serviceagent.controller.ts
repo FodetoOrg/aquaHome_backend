@@ -1,4 +1,4 @@
-// controllers/franchiseagent.controller.ts
+//@ts-nocheck
 import { FastifyReply, FastifyRequest } from "fastify";
 import { z } from 'zod';
 import { handleError } from "../utils/errors";

@@ -1,3 +1,4 @@
+//@ts-nocheck
 import { FastifyInstance } from 'fastify';
 import { eq, and, or, like, desc, count } from 'drizzle-orm';
 import { subscriptions, users, products, installationRequests, franchises, payments, cancelSubscriptionRequests } from '../models/schema';

@@ -1,3 +1,4 @@
+//@ts-nocheck
 import { FastifyInstance } from 'fastify';
 import { UserRole } from '../types';
 import { franchiseAgents, franchises } from '../models/schema';

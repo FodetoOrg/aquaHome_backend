@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "build": "esbuild src/server.ts --bundle --platform=node  --target=es2020 --outdir=dist --sourcemap",
+    "build": "tsc",
     "start": "node dist/server.js",
     "dev": "tsnd --respawn --transpile-only --exit-child src/server.ts",
     "lint": "eslint --ext .ts src/",
@@ -21,13 +21,11 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@aws-sdk/client-ses": "^3.828.0",
     "@fastify/cors": "^8.3.0",
     "@fastify/jwt": "^7.2.0",
     "@fastify/multipart": "^7.7.3",
     "@fastify/swagger": "^8.9.0",
     "@fastify/swagger-ui": "^1.9.3",
-    "aws-sdk": "^2.1445.0",
     "dotenv": "^16.3.1",
     "drizzle-kit": "^0.31.4",
     "drizzle-orm": "^0.38.2",

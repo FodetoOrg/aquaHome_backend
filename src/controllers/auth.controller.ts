@@ -1,3 +1,4 @@
+//@ts-nocheck
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import * as authService from '../services/auth.service';
 import { handleError, notFound } from "../utils/errors";

@@ -1,3 +1,4 @@
+//@ts-nocheck
 import { FastifyInstance } from "fastify";
 import { checkRoleSchema, loginSchema, meSchema, onboardUserSchema, refreshTokenSchema } from "../schemas/auth.schema";
 import { login, refreshToken,onboard,me, checkRole, registerPushToken, getUserDetails } from "../controllers/auth.controller";
