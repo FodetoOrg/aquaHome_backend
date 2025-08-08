@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { UserRole } from '../types';
 import { franchiseAgents, franchises } from '../models/schema';
 import { eq } from 'drizzle-orm'
+import { badRequest } from '../utils/errors';
 
 // Types for request/response
 interface ViewAsRequest {
@@ -124,6 +125,9 @@ export default async function viewAsRoutes(fastify: FastifyInstance) {
             }
             console.log('here came')
 
+            if(!franchise.owner){
+                throw badRequest('it is managed by company')
+            }
             const viewAsToken = await fastify.enableViewAs(
                 currentUser.userId,
                 franchise.owner.id, // Virtual user ID for franchise
