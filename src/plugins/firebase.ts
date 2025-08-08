@@ -1,62 +1,99 @@
 import fp from 'fastify-plugin';
 import { FastifyInstance } from 'fastify';
 import admin, { ServiceAccount } from 'firebase-admin';
-import { eq } from 'drizzle-orm';
 import * as dotenv from 'dotenv';
 
-// import ServiceAccountJson from '../config/service-account.json'
-
 dotenv.config();
+
+const bucketName = process.env.FIREBASE_STORAGE_BUCKET;
+if (!bucketName) {
+  throw new Error('FIREBASE_STORAGE_BUCKET is not set in your environment');
+}
 
 declare module 'fastify' {
   interface FastifyInstance {
     firebase: admin.app.App;
     push: {
-      /**
-       * Send a push notification to all devices for a user
-       * @param userId string
-       * @param title string
-       * @param message string
-       * @param referenceId string | undefined
-       * @param referenceType string | undefined
-       */
-      send: (userId: string, title: string, message: string, referenceId?: string, referenceType?: string) => Promise<void>;
+      send: (
+        userId: string,
+        title: string,
+        message: string,
+        referenceId?: string,
+        referenceType?: string
+      ) => Promise<void>;
     };
+    storageBucket: admin.storage.Storage['bucket'];
+    uploadToStorage: (
+      file: Buffer,
+      key: string,
+      contentType: string
+    ) => Promise<string>;
+    getSignedUrl: (key: string) => Promise<string>;
   }
 }
 
 const base64Cred = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
 if (!base64Cred) {
-  throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON is not set in environment variables");
+  throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON is not set');
 }
 
-const decoded = Buffer.from(base64Cred, 'base64').toString('utf8');
-const serviceAccount = JSON.parse(decoded);
+const serviceAccount = JSON.parse(
+  Buffer.from(base64Cred, 'base64').toString('utf8')
+) as ServiceAccount;
 
-
-if (!admin.apps.length && serviceAccount) {
+if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount as ServiceAccount),
+    credential: admin.credential.cert(serviceAccount),
+    storageBucket: bucketName,
   });
 }
 
-export default fp(async function (fastify: FastifyInstance) {
-  // Check if Firebase app is initialized
-  if (!admin.apps.length) {
-    fastify.log.warn('Firebase configuration missing or invalid. Firebase plugin not initialized.');
-    return;
-  }
-
+export default fp(async (fastify: FastifyInstance) => {
   const app = admin.app();
-
-  // Decorate Fastify instance with firebase
   fastify.decorate('firebase', app);
-  fastify.log.info('Firebase plugin registered');
 
-  // Add a hook to close the Firebase connection when the server is shutting down
+  // PUSH helper
+  fastify.decorate('push', {
+    send: async (
+      userId,
+      title,
+      message,
+      referenceId?,
+      referenceType?
+    ) => {
+      // your existing push logic here, e.g. fetch tokens & call app.messaging().sendMulticast(...)
+    },
+  });
+
+  // STORAGE helpers
+  const bucket = admin.storage().bucket();
+  fastify.decorate('storageBucket', bucket);
+
+  fastify.decorate(
+    'uploadToStorage',
+    async (file: Buffer, key: string, contentType: string) => {
+      const remoteFile = bucket.file(key);
+      await remoteFile.save(file, {
+        metadata: { contentType },
+        public: true,
+      });
+      return `https://storage.googleapis.com/${bucket.name}/${key}`;
+    }
+  );
+
+  fastify.decorate('getSignedUrl', async (key: string) => {
+    const remoteFile = bucket.file(key);
+    const [url] = await remoteFile.getSignedUrl({
+      action: 'read',
+      expires: Date.now() + 5 * 60 * 1000,
+    });
+    return url;
+  });
+
+  fastify.log.info('Firebase plugin (push + storage) registered');
+  
   fastify.addHook('onClose', async () => {
     await app.delete();
     fastify.log.info('Firebase connection closed');
   });
-
 });
