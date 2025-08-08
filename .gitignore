@@ -19,3 +19,5 @@ android
 
 
 src/config/service-account.json
+
+package-lock.json
