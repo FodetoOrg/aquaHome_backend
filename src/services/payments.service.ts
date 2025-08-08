@@ -2,7 +2,7 @@
 import { getFastifyInstance } from '../shared/fastify-instance';
 import { payments, users, franchises, subscriptions } from '../models/schema';
 import { eq, and, inArray } from 'drizzle-orm';
-import { notFound, forbidden } from '../utils/errors';
+import { notFound, forbidden, badRequest } from '../utils/errors';
 import { UserRole } from '../types';
 
 export interface Payment {
@@ -20,6 +20,44 @@ export interface Payment {
     updatedAt: string;
 }
 
+
+export async function getSubscriptionPayments(user, id) {
+
+    const fastify = getFastifyInstance()
+
+    const db = fastify.db
+
+    console.log('came here in payments')
+
+    const sub = await db.query.subscriptions.findFirst({
+        where: eq(subscriptions.id, id)
+    })
+
+    console.log('sub is ', sub)
+
+    if (!sub) {
+        throw badRequest('subscription not found')
+    }
+
+    if (sub.customerId !== user.userId) {
+        throw badRequest('you dont have access')
+    }
+
+    const paymentsDb = await db.query.payments.findMany({
+        where: eq(payments.subscriptionId, id),
+
+    })
+    return {
+        payments: paymentsDb,
+        subscriptionDetails: {
+            id: sub.id,
+            nextPaymentDate: sub.currentPeriodEndDate,
+
+        }
+    }
+
+
+}
 /**
  * Get payments based on user role
  */
@@ -63,7 +101,7 @@ export async function getPaymentsByRole(user: any) {
             const franchise = await db.query.franchises.findFirst({
                 where: eq(franchises.ownerId, user.userId)
             });
-            
+
             if (!franchise) {
                 throw notFound('Franchise area not found for this owner');
             }
@@ -167,7 +205,7 @@ export async function getPaymentById(paymentId: string, user: any) {
             const franchise = await db.query.franchises.findFirst({
                 where: eq(franchises.ownerId, user.userId)
             });
-            
+
             if (!franchise || payment.franchiseId !== franchise.id) {
                 throw forbidden('Access denied to this payment');
             }

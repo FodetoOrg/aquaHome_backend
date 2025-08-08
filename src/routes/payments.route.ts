@@ -1,6 +1,6 @@
 
 import { FastifyInstance } from 'fastify';
-import { getPayments, getPaymentById } from '../controllers/payments.controller';
+import { getPayments, getPaymentById, getSubscriptionPayments } from '../controllers/payments.controller';
 import { getPaymentsSchema, getPaymentByIdSchema } from '../schemas/payments.schema';
 
 export default async function (fastify: FastifyInstance) {
@@ -12,6 +12,15 @@ export default async function (fastify: FastifyInstance) {
             preHandler: [fastify.authenticate],
         },
         (request, reply) => getPayments(request as any, reply as any)
+    );
+
+    fastify.get(
+        '/subscription/:id',
+        {
+
+            preHandler: [fastify.authenticate],
+        },
+        (request, reply) => getSubscriptionPayments(request as any, reply as any)
     );
 
     // Get payment by ID

@@ -49,6 +49,14 @@ export const products = sqliteTable("products", {
     updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
 });
 
+export const razorpayPlans = sqliteTable('razorpay_plans', {
+    id: text("id").primaryKey(),
+    razorpayPlanId: text('razorpay_plan_id').notNull(),
+    amount: integer('amount'),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+})
+
 export const franchises = sqliteTable("franchises", {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
@@ -88,6 +96,7 @@ export const installationRequests = sqliteTable('installation_requests', {
     razorpayPaymentLink: text('razorpay_payment_link'),
     razorpaySubscriptionId: text('razorpay_subscription_id'),
     autoPaymentEnabled: boolean('auto_payment_enabled').default(false),
+    payAmount: integer('pay_amount')
 });
 
 // Subscriptions table - ONLY for RENTAL orders (not purchases)
@@ -113,6 +122,14 @@ export const subscriptions = sqliteTable("subscriptions", {
     updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
 });
 
+export const cancelSubscriptionRequests = sqliteTable('cancelSubscriptionRequests', {
+    id: text('id').primaryKey(),
+    subcriptionId: text('subscription_id').notNull().references(() => subscriptions.id),
+    reason: text('reason').notNull(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+})
+
 export const serviceRequests = sqliteTable("service_requests", {
     id: text("id").primaryKey(),
     subscriptionId: text("subscription_id").references(() => subscriptions.id), // ONLY for rental customers (can be NULL)
@@ -128,11 +145,12 @@ export const serviceRequests = sqliteTable("service_requests", {
     franchiseId: text("franchise_id").notNull().references(() => franchises.id),
     scheduledDate: text("scheduled_date"),
     completedDate: text("completed_date"),
-    requirePayment : integer('require_payment',{mode:'boolean'}).notNull().default(false),
+    requirePayment: integer('require_payment', { mode: 'boolean' }).notNull().default(false),
     beforeImages: text("before_images"), // JSON array - agent uploads before service
     afterImages: text("after_images"), // JSON array - agent uploads after service
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
-    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    cancelReason: text('canel_reason')
 });
 
 // NEW: Payments table for rental subscriptions and service charges
@@ -394,6 +412,7 @@ export const subscriptionsRelations = relations(subscriptions, ({ one, many }) =
         fields: [subscriptions.franchiseId],
         references: [franchises.id],
     }),
+    cancelSubscriptionRequests: many(cancelSubscriptionRequests),
 
     // Service requests for this subscription
     serviceRequests: many(serviceRequests, { relationName: "subscriptionServiceRequests" }),
@@ -405,6 +424,13 @@ export const subscriptionsRelations = relations(subscriptions, ({ one, many }) =
     actionHistory: many(actionHistory, { relationName: "subscriptionActionHistory" }),
 }));
 
+export const cancelSubscriptionRequestsRelations = relations(cancelSubscriptionRequests, ({ one })  => ({
+    subscriptions: one(subscriptions, {
+        fields: [cancelSubscriptionRequests.subcriptionId],
+        references: [subscriptions.id],
+        relationName: "cancelSubscriptionRequests",
+    })
+}))
 // Service Requests Relations
 export const serviceRequestsRelations = relations(serviceRequests, ({ one, many }) => ({
     // Customer requesting service

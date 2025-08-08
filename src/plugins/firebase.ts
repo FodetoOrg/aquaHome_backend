@@ -1,7 +1,6 @@
 import fp from 'fastify-plugin';
 import { FastifyInstance } from 'fastify';
 import admin, { ServiceAccount } from 'firebase-admin';
-import { pushSubscriptions } from '../models/schema';
 import { eq } from 'drizzle-orm';
 import * as dotenv from 'dotenv';
 
@@ -60,37 +59,4 @@ export default fp(async function (fastify: FastifyInstance) {
     fastify.log.info('Firebase connection closed');
   });
 
-  fastify.decorate('push', {
-    /**
-     * Send a push notification to all devices for a user
-     * @param userId string
-     * @param title string
-     * @param message string
-     * @param referenceId string | undefined
-     * @param referenceType string | undefined
-     */
-    async send(userId: string, title: string, message: string, referenceId?: string, referenceType?: string) {
-      if (!userId) return;
-      const tokens = await fastify.db.query.pushSubscriptions.findMany({
-        where: eq(pushSubscriptions.userId, userId),
-      });
-      if (!tokens.length) return;
-      const payload = {
-        notification: {
-          title,
-          body: message,
-        },
-        data: {
-          ...(referenceId ? { referenceId } : {}),
-          ...(referenceType ? { referenceType } : {}),
-        },
-      };
-      const tokenList = tokens.map((t: any) => t.endpoint);
-      try {
-        await admin.messaging().sendToDevice(tokenList, payload);
-      } catch (err) {
-        fastify.log.error('FCM push error', err);
-      }
-    },
-  });
 });

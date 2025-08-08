@@ -13,7 +13,7 @@ export async function getPayments(
     try {
         const user = request.user;
         const payments = await paymentsService.getPaymentsByRole(user);
-        
+
         return reply.code(200).send({
             payments,
             total: payments.length
@@ -23,6 +23,24 @@ export async function getPayments(
     }
 }
 
+
+export async function getSubscriptionPayments(request: FastifyRequest,
+    reply: FastifyReply) {
+
+    try {
+        const user = request.user;
+        const { id } = request.params
+        const result = await paymentsService.getSubscriptionPayments(user, id);
+        return reply.code(200).send({
+            result,
+
+        });
+
+    } catch (e) {
+        handleError(error, request, reply);
+    }
+
+}
 /**
  * Get payment by ID
  */
@@ -33,9 +51,9 @@ export async function getPaymentById(
     try {
         const { id } = request.params;
         const user = request.user;
-        
+
         const payment = await paymentsService.getPaymentById(id, user);
-        
+
         return reply.code(200).send({ payment });
     } catch (error) {
         handleError(error, request, reply);

@@ -101,6 +101,7 @@ export const GetAllServiceRequestsQuerySchema = z.object({
   type: z.enum(Object.values(ServiceRequestType) as [ServiceRequestType, ...ServiceRequestType[]]).optional(),
   franchiseId: z.string().optional(),
   customerId: z.string().optional(),
+  subscriptionId:z.string().optional()
 });
 
 export const GetAllServiceRequestsResponseSchema = z.object({
