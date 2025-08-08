@@ -9,6 +9,7 @@ import {
   resumeSubscription,
   terminateSubscription,
   cancelRequest,
+  genAllCancelRequests,
 } from '../controllers/subscriptions.controller';
 import {
   createSubscriptionSchema,
@@ -95,7 +96,7 @@ export default async function (fastify: FastifyInstance) {
   fastify.patch(
     '/:id/terminate',
     {
-      schema: terminateSubscriptionSchema,
+      // schema: terminateSubscriptionSchema,
       preHandler: [fastify.authenticate, fastify.authorizeRoles([UserRole.ADMIN, UserRole.FRANCHISE_OWNER])],
     },
     (request, reply) => terminateSubscription(request as any, reply as any)
@@ -109,6 +110,14 @@ export default async function (fastify: FastifyInstance) {
     },
     (request, reply) => cancelRequest(request as any, reply as any)
   );
+
+  fastify.get(
+    '/cancelRequests',
+    {
+      preHandler: [fastify.authenticate]
+    },
+    (request, reply) => genAllCancelRequests(request as any, reply as any)
+  )
 
 
 

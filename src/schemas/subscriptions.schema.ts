@@ -29,7 +29,7 @@ export const ProductInSubscriptionSchema = z.object({
   isRentable: z.boolean(),
   isPurchasable: z.boolean(),
   isActive: z.boolean(),
-  categoryId:z.string()
+  categoryId: z.string()
 });
 
 // Installation Request Schema for subscription relationships
@@ -291,8 +291,8 @@ export const TerminateSubscriptionParamsSchema = z.object({
 });
 
 export const TerminateSubscriptionBodySchema = z.object({
-  reason: z.string(),
-  refundDeposit: z.boolean().optional().default(false),
+  override: z.boolean().optional().default(false),
+
 });
 
 export const TerminateSubscriptionResponseSchema = z.object({

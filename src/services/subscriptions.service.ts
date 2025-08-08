@@ -3,10 +3,12 @@ import { eq, and, or, like, desc, count } from 'drizzle-orm';
 import { subscriptions, users, products, installationRequests, franchises, payments, cancelSubscriptionRequests } from '../models/schema';
 import { RentalStatus, UserRole, InstallationRequestStatus, PaymentType, PaymentStatus, ActionType } from '../types';
 import { generateId, parseJsonSafe } from '../utils/helpers';
-import { notFound, badRequest, forbidden } from '../utils/errors';
+import { notFound, badRequest, forbidden, serverError } from '../utils/errors';
 import { getFastifyInstance } from '../shared/fastify-instance';
 import { logActionHistory } from '../utils/actionHistory';
 import Razorpay from 'razorpay';
+import { notificationService } from './notification.service';
+import { getUserById } from './user.service';
 
 // Initialize Razorpay (you should put these in environment variables)
 const razorpay = new Razorpay({
@@ -571,13 +573,14 @@ export async function resumeSubscription(id: string, user: any) {
 
   return await getSubscriptionById(id);
 }
-
-// Terminate subscription
-export async function terminateSubscription(id: string, user: any, options: { reason: string; refundDeposit?: boolean }) {
+export async function terminateSubscription(id: string, user: any, override: boolean = false) {
   const fastify = getFastifyInstance();
-  const subscription = await getSubscriptionById(id);
+  const subscription = await fastify.db.query.subscriptions.findFirst({
+    where: eq(subscriptions.id, id)
+  });
   if (!subscription) throw notFound('Subscription');
 
+  console.log('subscription in terminsate', subscription)
   // Check permissions
   if (user.role === UserRole.FRANCHISE_OWNER) {
     const franchise = await getFranchiseById(subscription.franchiseId);
@@ -592,31 +595,87 @@ export async function terminateSubscription(id: string, user: any, options: { re
     throw badRequest('Only active or paused subscriptions can be terminated');
   }
 
-  await fastify.db.update(subscriptions).set({
-    status: RentalStatus.TERMINATED,
-    updatedAt: new Date().toISOString(),
-  }).where(eq(subscriptions.id, id));
+  const cancelRequest = await fastify.db.query.cancelSubscriptionRequests.findFirst({
+    where: eq(cancelSubscriptionRequests.subcriptionId, subscription.id)
+  })
+  if (!cancelRequest && override === false) {
+    throw badRequest('there is no cancel reqeust from user')
+  }
 
+  // Cancel Razorpay subscription if exists
+  if (subscription.razorpaySubscriptionId) {
+    try {
+      const razorpaySubscription = await fastify.razorpay.subscriptions.fetch(subscription.razorpaySubscriptionId);
 
+      if (razorpaySubscription.status === 'active' || razorpaySubscription.status === 'authenticated') {
+        const response = await fastify.razorpay.subscriptions.cancel(subscription.razorpaySubscriptionId);
+        console.log('response ', response)
+        if (response?.status === 'cancelled') {
 
-  // Log action history
-  await logActionHistory({
-    subscriptionId: id,
-    actionType: ActionType.SUBSCRIPTION_TERMINATED,
-    fromStatus: subscription.status,
-    toStatus: RentalStatus.TERMINATED,
-    performedBy: user.userId,
-    performedByRole: user.role,
-    comment: options.reason,
-    metadata: { refundDeposit: options.refundDeposit }
-  });
+          console.log(`Razorpay subscription ${subscription.razorpaySubscriptionId} cancelled successfully`);
 
-  // TODO: Cancel Razorpay subscription
-  // TODO: Send notification to customer
-  // TODO: Create uninstallation service request
+          await fastify.db.update(subscriptions).set({
+            status: RentalStatus.TERMINATED,
+            updatedAt: new Date().toISOString(),
+          }).where(eq(subscriptions.id, id));
 
-  return await getSubscriptionById(id);
+          await logActionHistory({
+            subscriptionId: id,
+            actionType: ActionType.SUBSCRIPTION_TERMINATED,
+            fromStatus: subscription.status,
+            toStatus: RentalStatus.TERMINATED,
+            performedBy: user.userId,
+            performedByRole: user.role,
+            comment: cancelRequest ? cancelRequest.reason : `${user.role} terminated subscription`,
+            metadata: {}
+          });
+
+          // Send notification to customer
+          try {
+            // Get customer details
+            const customer = await getUserById(subscription.customerId); // Assuming you have this function
+
+            if (customer && customer.pushNotificationToken) {
+              await notificationService.sendSinglePushNotification({
+                pushToken: customer.pushNotificationToken,
+                title: 'Subscription Terminated',
+                message: `Your subscription has been terminated. Reason: ${cancelRequest ? cancelRequest.reason : `${user.role} terminated subscription`}`,
+                data: {
+                  type: 'subscription_terminated',
+                  subscriptionId: id,
+                  reason: cancelRequest.reason
+                }
+              });
+            }
+            return await getSubscriptionById(id);
+          } catch (error) {
+            console.error('Error sending termination notification:', error);
+            // Continue even if notification fails
+          }
+        } else {
+          throw serverError('unable to cancel subscription ')
+        }
+
+      } else {
+        throw notFound('subscription')
+      }
+    } catch (error) {
+      console.log('Error cancelling Razorpay subscription:', error);
+      // Continue with termination even if Razorpay cancellation fails
+    }
+  } else {
+    throw notFound('subscription not found ')
+  }
 }
+
+
+
+// Update subscription status in database
+
+// Log action history
+
+
+
 
 
 export async function cancelSubRequest(user: any, id: string, reason: string) {
@@ -634,12 +693,89 @@ export async function cancelSubRequest(user: any, id: string, reason: string) {
   }
 
 
-
-  await db.insert(cancelSubscriptionRequests).values({
-    id: await generateId('cancel_sub'),
-    subcriptionId: sub.id,
-    reason: reason
+  const cancelSubRequest = await db.query.cancelSubscriptionRequests.findFirst({
+    where: eq(cancelSubscriptionRequests.subcriptionId, id)
   })
 
+  if (cancelSubRequest) {
 
+    await db.update(cancelSubscriptionRequests).set({
+      reason: reason,
+      updatedAt: new Date()
+    }).where(eq(cancelSubscriptionRequests.id, cancelSubRequest.id))
+
+  } else {
+
+    await db.insert(cancelSubscriptionRequests).values({
+      id: await generateId('cancel_sub'),
+      subcriptionId: sub.id,
+      reason: reason
+    })
+  }
+
+
+
+}
+export async function genAllCancelRequests(user) {
+  const db = getFastifyInstance().db
+
+  let whereConditions = []
+
+  console.log('user cr  is ', user)
+
+  if (user.role === UserRole.FRANCHISE_OWNER) {
+    // First, get the franchise owned by this user
+    const franchise = await db.query.franchises.findFirst({
+      where: eq(franchises.ownerId, user.userId),
+      columns: { id: true }
+    })
+
+    if (!franchise) {
+      return [] // No franchise found for this owner
+    }
+
+    whereConditions.push(
+      eq(subscriptions.franchiseId, franchise.id)
+    )
+  }
+
+  const cancelRequests = await db.query.cancelSubscriptionRequests.findMany({
+    columns: {
+      id: true,
+      reason: true,
+      createdAt: true
+    },
+    with: {
+      subscriptions: {
+        ...(whereConditions.length > 0 && { where: and(...whereConditions) }),
+        columns: {
+          id: true,
+          connectId: true,
+          requestId: true,
+          status: true,
+          franchiseId: true
+        },
+        with: {
+          customer: {
+            columns: {
+              id: true,
+              phone: true,
+              alternativePhone: true,
+              city: true
+            }
+          },
+          franchise: {
+            columns: {
+              id: true,
+              name: true,
+              city: true
+            }
+          }
+        }
+      }
+    }
+  })
+
+  // Filter out cancel requests where subscription is null (due to franchise filtering)
+  return cancelRequests.filter(request => request.subscriptions !== null)
 }

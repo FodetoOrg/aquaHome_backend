@@ -33,7 +33,7 @@ export default async function (fastify: FastifyInstance) {
   fastify.get(
     '/',
     {
-      schema: getAllServiceRequestsSchema,
+      // schema: getAllServiceRequestsSchema,
       preHandler: [fastify.authenticate],
     },
     (request, reply) => getAllServiceRequests(request as any, reply as any)
@@ -164,7 +164,7 @@ export default async function (fastify: FastifyInstance) {
   // Get all unassigned service requests (for service agents)
   fastify.get('/unassigned', {
     preHandler: [fastify.authenticate],
-    schema: getAllServiceRequestsSchema
+    // schema: getAllServiceRequestsSchema
   }, getUnassignedServiceRequests);
 
   // Assign service request to self

@@ -6,9 +6,9 @@ export enum UserRole {
 }
 export enum RentalStatus {
     ACTIVE = 'ACTIVE',
-    PAUSED = 'paused',
-    TERMINATED = 'terminated',
-    EXPIRED = 'expired',
+    PAUSED = 'PAUSED',
+    TERMINATED = 'TERMINATED',
+    EXPIRED = 'EXPIRED',
 }
 
 

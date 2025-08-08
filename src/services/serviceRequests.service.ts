@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { eq, and, or, inArray } from 'drizzle-orm';
+import { eq, and, or, inArray, isNull } from 'drizzle-orm';
 import { serviceRequests, users, products, subscriptions, installationRequests, franchises, payments, franchiseAgents } from '../models/schema';
 import { ServiceRequestStatus, ServiceRequestType, UserRole, ActionType, InstallationRequestStatus, PaymentStatus, PaymentType } from '../types';
 import { generateId, parseJsonSafe } from '../utils/helpers';
@@ -56,6 +56,9 @@ export async function getAllServiceRequests(filters: any, user: any) {
   if (filters.customerId) {
     whereConditions.push(eq(serviceRequests.customerId, filters.customerId));
   }
+  if (filters.subscriptionId) {
+    whereConditions.push(eq(serviceRequests.subscriptionId, filters.subscriptionId));
+  }
 
   const results = await fastify.db.query.serviceRequests.findMany({
     where: whereConditions.length ? and(...whereConditions) : undefined,
@@ -68,6 +71,8 @@ export async function getAllServiceRequests(filters: any, user: any) {
     },
     orderBy: (serviceRequests, { desc }) => [desc(serviceRequests.createdAt)],
   });
+
+  console.log('results in srs ',results)
 
   // Process results to ensure proper data structure and parse images
   return results.map(sr => ({
@@ -482,11 +487,11 @@ export async function updateServiceRequestStatus(
         throw badRequest('Completion images are required to mark as completed');
       }
       // If it requires payment and coming from IN_PROGRESS, must go through PAYMENT_PENDING first
-      if (serviceRequest.requiresPayment && currentStatus === ServiceRequestStatus.IN_PROGRESS) {
+      if (serviceRequest.requirePayment && currentStatus === ServiceRequestStatus.IN_PROGRESS) {
         throw badRequest('Service requests requiring payment must go through PAYMENT_PENDING status first');
       }
 
-      if (serviceRequest.requiresPayment && serviceRequest.installationRequestId) {
+      if (serviceRequest.requirePayment && serviceRequest.installationRequestId) {
         const paymnet = await db.query.payments.findFirst({
           where: eq(payments.installationRequestId, serviceRequest.installationRequestId)
         })
@@ -780,10 +785,11 @@ export async function scheduleServiceRequest(id: string, scheduledDate: string, 
 export async function getAllUnassignedServiceRequests(user: any) {
   const fastify = getFastifyInstance();
   let whereConditions: any[] = [
-    eq(serviceRequests.assignedToId, null), // Unassigned
-    eq(serviceRequests.installationRequestId, null), // Not installation type
+    isNull(serviceRequests.assignedToId), // Unassigned
+    isNull(serviceRequests.installationRequestId), // Not installation type
     inArray(serviceRequests.status, [ServiceRequestStatus.CREATED, ServiceRequestStatus.ASSIGNED])
   ];
+
 
   // For service agents, only show requests from their franchise
   if (user.role === UserRole.SERVICE_AGENT) {
@@ -791,7 +797,7 @@ export async function getAllUnassignedServiceRequests(user: any) {
     const agentFranchises = await fastify.db.query.franchiseAgents.findMany({
       where: eq(franchiseAgents.agentId, user.userId)
     });
-
+    console.log('agentFranchises ', agentFranchises)
     if (agentFranchises.length > 0) {
       const franchiseIds = agentFranchises.map(fa => fa.franchiseId);
       whereConditions.push(inArray(serviceRequests.franchiseId, franchiseIds));
@@ -820,7 +826,7 @@ export async function getAllUnassignedServiceRequests(user: any) {
     id: sr.id,
     description: sr.description,
     type: sr.type,
-    priority: 'normal', // You might want to add priority to schema
+    priority: 'high', // You might want to add priority to schema
     status: 'open',
     createdAt: sr.createdAt,
     customerName: sr.customer?.name || 'Unknown',
@@ -1134,13 +1140,14 @@ export async function refreshPaymentStatus(serviceRequestId: string, user: any) 
                 monthlyAmount: installationRequest.product.rentPrice,
                 depositAmount: installationRequest.product.deposit,
                 createdAt: now,
-                updatedAt: now
+                updatedAt: now,
+                razorpaySubscriptionId: successfulPayment.subscriptionDetails.id
               });
 
               // Update payment record with subscription ID if not already linked
               if (!existingPayment.subscriptionId) {
                 await tx.update(payments)
-                  .set({ subscriptionId, updatedAt: now })
+                  .set({ subscriptionId, updatedAt: now, razorpaySubscriptionId: successfulPayment.subscriptionDetails.id })
                   .where(eq(payments.id, existingPayment.id));
               }
 
@@ -1150,7 +1157,8 @@ export async function refreshPaymentStatus(serviceRequestId: string, user: any) 
                   connectId,
                   status: InstallationRequestStatus.INSTALLATION_COMPLETED,
                   completedDate: now,
-                  updatedAt: now
+                  updatedAt: now,
+                  razorpaySubscriptionId: successfulPayment.subscriptionDetails.id
                 })
                 .where(eq(installationRequests.id, serviceRequest.installationRequestId));
 
@@ -1158,6 +1166,8 @@ export async function refreshPaymentStatus(serviceRequestId: string, user: any) 
               await tx.update(serviceRequests)
                 .set({
                   status: ServiceRequestStatus.COMPLETED,
+                  razorpaySubscriptionId: successfulPayment.subscriptionDetails.id,
+                  subscriptionId: subscriptionId,
                   completedAt: now,
                   updatedAt: now
                 })
@@ -1202,7 +1212,7 @@ export async function refreshPaymentStatus(serviceRequestId: string, user: any) 
             .set({
               status: PaymentStatus.COMPLETED,
               razorpayPaymentId: successfulPayment.id,
-              razorpaySubscriptionId: successfulPayment.razorpaySubscriptionId,
+              razorpaySubscriptionId: successfulPayment.subscriptionDetails.id,
               paymentMethod: successfulPayment.method,
               amount: successfulPayment.amount,
               paidDate: now,
@@ -1219,7 +1229,7 @@ export async function refreshPaymentStatus(serviceRequestId: string, user: any) 
             status: PaymentStatus.COMPLETED,
             paymentMethod: successfulPayment.method,
             razorpayPaymentId: successfulPayment.id,
-            razorpaySubscriptionId: successfulPayment.razorpaySubscriptionId,
+            razorpaySubscriptionId: successfulPayment.subscriptionDetails.id,
             paidDate: now,
             createdAt: now,
             updatedAt: now
@@ -1257,7 +1267,8 @@ export async function refreshPaymentStatus(serviceRequestId: string, user: any) 
               monthlyAmount: installationRequest.product.rentPrice,
               depositAmount: installationRequest.product.deposit,
               createdAt: now,
-              updatedAt: now
+              updatedAt: now,
+              razorpaySubscriptionId: successfulPayment.subscriptionDetails.id,
             });
 
             // Update payment record with subscription ID
@@ -1272,6 +1283,12 @@ export async function refreshPaymentStatus(serviceRequestId: string, user: any) 
                 updatedAt: now
               })
               .where(eq(installationRequests.id, serviceRequest.installationRequestId));
+            await tx.update(serviceRequests)
+              .set({
+                subscriptionId: subscriptionId
+
+              })
+              .where(eq(serviceRequests.id, serviceRequestId));
           }
         }
 
@@ -1280,7 +1297,8 @@ export async function refreshPaymentStatus(serviceRequestId: string, user: any) 
           .set({
             status: InstallationRequestStatus.INSTALLATION_COMPLETED,
             completedDate: now,
-            updatedAt: now
+            updatedAt: now,
+            razorpaySubscriptionId: successfulPayment.subscriptionDetails.id,
           })
           .where(eq(installationRequests.id, serviceRequest.installationRequestId));
 
@@ -1289,7 +1307,9 @@ export async function refreshPaymentStatus(serviceRequestId: string, user: any) 
           .set({
             status: ServiceRequestStatus.COMPLETED,
             completedAt: now,
-            updatedAt: now
+            updatedAt: now,
+            razorpaySubscriptionId: successfulPayment.subscriptionDetails.id,
+
           })
           .where(eq(serviceRequests.id, serviceRequestId));
 
@@ -1305,7 +1325,7 @@ export async function refreshPaymentStatus(serviceRequestId: string, user: any) 
           comment: 'Payment status refreshed from Razorpay',
           metadata: {
             razorpayPaymentId: successfulPayment.id,
-            razorpaySubscriptionId: successfulPayment.razorpaySubscriptionId
+            razorpaySubscriptionId: successfulPayment.subscriptionDetails.id,
           }
         });
 

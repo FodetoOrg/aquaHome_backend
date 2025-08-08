@@ -412,6 +412,7 @@ export const subscriptionsRelations = relations(subscriptions, ({ one, many }) =
         fields: [subscriptions.franchiseId],
         references: [franchises.id],
     }),
+    cancelSubscriptionRequests: many(cancelSubscriptionRequests),
 
     // Service requests for this subscription
     serviceRequests: many(serviceRequests, { relationName: "subscriptionServiceRequests" }),
@@ -423,6 +424,13 @@ export const subscriptionsRelations = relations(subscriptions, ({ one, many }) =
     actionHistory: many(actionHistory, { relationName: "subscriptionActionHistory" }),
 }));
 
+export const cancelSubscriptionRequestsRelations = relations(cancelSubscriptionRequests, ({ one })  => ({
+    subscriptions: one(subscriptions, {
+        fields: [cancelSubscriptionRequests.subcriptionId],
+        references: [subscriptions.id],
+        relationName: "cancelSubscriptionRequests",
+    })
+}))
 // Service Requests Relations
 export const serviceRequestsRelations = relations(serviceRequests, ({ one, many }) => ({
     // Customer requesting service

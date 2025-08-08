@@ -76,6 +76,7 @@ export async function getAllSubscriptions(
     const user = request.user;
 
     console.log('Getting all subscriptions with filters:', filters);
+    console.log('user in all subs ', user)
 
     const result = await subscriptionService.getAllSubscriptions(filters, user);
     return reply.code(200).send(result);
@@ -207,20 +208,20 @@ export async function terminateSubscription(
   request: FastifyRequest<{
     Params: { id: string };
     Body: {
-      reason: string;
-      refundDeposit?: boolean;
+      override: boolean;
+
     }
   }>,
   reply: FastifyReply
 ) {
   try {
     const { id } = request.params;
-    const { reason, refundDeposit } = request.body;
+    const { override = false } = request.body;
     const user = request.user;
 
     console.log('Terminating subscription:', id);
 
-    const subscription = await subscriptionService.terminateSubscription(id, user, { reason, refundDeposit });
+    const subscription = await subscriptionService.terminateSubscription(id, user, override);
     return reply.code(200).send({
       message: 'Subscription terminated successfully',
       subscription
@@ -239,7 +240,7 @@ export async function cancelRequest(request: FastifyRequest, reply: FastifyReply
       throw badRequest('You dont have access to raise cancel request 1')
     }
     const { id } = request.params
-    const { reason }= request.body
+    const { reason } = request.body
 
     if (!reason) {
       throw badRequest('please provide reason')
@@ -256,4 +257,31 @@ export async function cancelRequest(request: FastifyRequest, reply: FastifyReply
     handleError(error, request, reply);
   }
 
-} 
+}
+
+export async function genAllCancelRequests(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    const user = request.user;
+
+
+    if (user.role === UserRole.CUSTOMER) {
+      throw badRequest('You dont have access to raise cancel request 1')
+    }
+
+
+
+
+    const result = await subscriptionService.genAllCancelRequests(user)
+
+    return reply.code(200).send({
+      message: 'requested sucessfully',
+      result
+
+    })
+
+  } catch (error) {
+    handleError(error, request, reply);
+  }
+
+}
+
