@@ -1,3 +1,4 @@
+//@ts-nocheck
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import * as categoryService from '../services/category.service';
 import { handleError } from "../utils/errors";

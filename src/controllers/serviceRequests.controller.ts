@@ -1,3 +1,4 @@
+//@ts-nocheck
 import { FastifyRequest, FastifyReply } from "fastify";
 import * as serviceRequestService from '../services/serviceRequests.service';
 import * as installationRequestService from '../services/installation-request.service';

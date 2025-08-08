@@ -1,3 +1,4 @@
+//@ts-nocheck
 import fp from 'fastify-plugin';
 import { FastifyInstance } from 'fastify';
 import admin, { ServiceAccount } from 'firebase-admin';

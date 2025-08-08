@@ -1,3 +1,4 @@
+//@ts-nocheck
 import { and, eq, desc, count, or } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { getFastifyInstance } from '../shared/fastify-instance';

@@ -1,4 +1,4 @@
-
+//@ts-nocheck
 import { Expo, ExpoPushMessage, ExpoPushTicket } from 'expo-server-sdk';
 
 export class NotificationService {

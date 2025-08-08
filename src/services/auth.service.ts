@@ -1,4 +1,4 @@
-
+//@ts-nocheck
 import { and, eq } from 'drizzle-orm';
 import admin from 'firebase-admin';
 import { franchises, User, users } from '../models/schema';

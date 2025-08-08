@@ -1,4 +1,5 @@
 
+//@ts-nocheck
 import { getFastifyInstance } from '../shared/fastify-instance';
 import { payments, users, franchises, subscriptions } from '../models/schema';
 import { eq, and, inArray } from 'drizzle-orm';

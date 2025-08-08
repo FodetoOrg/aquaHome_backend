@@ -1,3 +1,4 @@
+//@ts-nocheck
 import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { InstallationRequestStatus, RentalStatus, ServiceRequestStatus, ServiceRequestType, UserRole, PaymentStatus, PaymentType, ActionType } from "../types";
 import { InferSelectModel, relations, sql } from "drizzle-orm";

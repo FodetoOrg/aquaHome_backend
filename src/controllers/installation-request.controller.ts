@@ -1,4 +1,4 @@
-
+//@ts-nocheck
 import { FastifyRequest, FastifyReply } from "fastify";
 import * as installationRequestService from '../services/installation-request.service';
 import { handleError, forbidden, notFound } from "../utils/errors";

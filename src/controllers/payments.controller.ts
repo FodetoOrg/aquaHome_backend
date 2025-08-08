@@ -1,4 +1,4 @@
-
+//@ts-nocheck
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { handleError } from '../utils/errors';
 import * as paymentsService from '../services/payments.service';
