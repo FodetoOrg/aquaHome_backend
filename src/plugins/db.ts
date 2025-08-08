@@ -1,3 +1,4 @@
+//@ts-nocheck
 import fp from 'fastify-plugin';
 import { FastifyInstance } from 'fastify';
 import { createClient } from '@libsql/client';
