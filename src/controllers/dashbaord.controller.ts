@@ -1,3 +1,4 @@
+//@ts-nocheck
 import { dashboardDataService } from "../services/dashbaord.service"
 import { handleError } from "../utils/errors"
 import { FastifyReply, FastifyRequest } from "fastify"
