@@ -68,7 +68,7 @@ const CreateFranchiseAreaBodySchema = z.object({
     city: z.string().min(2, 'City must be at least 2 characters'),
     geoPolygon: z
       .array(coordinateSchema)
-      .min(4, 'GeoPolygon must have at least 3 coordinates to form a valid area'),
+      .min(4, 'GeoPolygon must have at least 3 coordinates to form a valid area').optional(),
     phoneNumber: z.string().optional(),
   });
 
@@ -85,7 +85,6 @@ const CreateFranchiseAreaResponseSchema = z.object({
   id: z.string(),
   name: z.string(),
   city: z.string(),
-  geoPolygon: z.any(),
   isCompanyManaged: z.boolean(),
 });
 

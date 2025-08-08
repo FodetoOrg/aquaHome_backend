@@ -117,7 +117,10 @@ export async function createFranchiseArea(data: any) {
         }
 
         // Normalize and store polygon coordinates
-        const normalizedPolygon = normalizePolygonCoordinates(geoPolygon);
+        let normalizedPolygon;
+        if (geoPolygon) {
+            normalizedPolygon = normalizePolygonCoordinates(geoPolygon);
+        }
         const franchiseAreaId = uuidv4();
         let ownerId: string | null = null;
 
@@ -140,11 +143,20 @@ export async function createFranchiseArea(data: any) {
             // Create franchise area
             const [createdArea] = await tx
                 .insert(franchises)
-                .values({
+                .values(normalizedPolygon ? {
                     id: franchiseAreaId,
                     name,
                     city,
                     geoPolygon: JSON.stringify(normalizedPolygon),
+                    ownerId: ownerId,
+                    isCompanyManaged: !phoneNumber,
+                    createdAt: now,
+                    updatedAt: now,
+                } : {
+                    id: franchiseAreaId,
+                    name,
+                    city,
+
                     ownerId: ownerId,
                     isCompanyManaged: !phoneNumber,
                     createdAt: now,

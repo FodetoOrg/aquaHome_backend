@@ -62,7 +62,7 @@ export const franchises = sqliteTable("franchises", {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     city: text("city").notNull(),
-    geoPolygon: text("geo_polygon", { mode: 'json' }).notNull(),
+    geoPolygon: text("geo_polygon", { mode: 'json' }),
     ownerId: text("owner_id")
         .references(() => users.id, {
             onDelete: 'set null', // 👈 Set to NULL if user is deleted
