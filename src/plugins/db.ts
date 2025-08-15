@@ -1,7 +1,7 @@
 //@ts-nocheck
 import fp from 'fastify-plugin';
 import { FastifyInstance } from 'fastify';
-import { createClient } from '@libsql/client';
+import { createClient } from '@libsql/client/http';
 import { drizzle } from 'drizzle-orm/libsql';
 import * as schema from '../models/schema';
 
