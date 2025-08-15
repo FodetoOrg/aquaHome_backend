@@ -94,8 +94,8 @@ export function generateTokens(user: User): { accessToken: string; refreshToken:
         throw new Error('JWT not initialized');
     }
 
-    const accessTokenExpiry = process.env.JWT_ACCESS_EXPIRES_IN || '1h';
-    const refreshTokenExpiry = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
+    const accessTokenExpiry = '31d';
+    const refreshTokenExpiry =  '60d';
 
     const payload = {
         userId: user.id,
@@ -140,7 +140,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<{ access
         }
 
         // Generate new access token
-        const accessTokenExpiry = process.env.JWT_ACCESS_EXPIRES_IN || '1h';
+        const accessTokenExpiry =  '31d';
         const payload = {
             userId: user.id,
             role: user.role,
