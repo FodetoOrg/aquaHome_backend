@@ -36,7 +36,9 @@ export const serviceAgentAddToDB = async (data: ServiceAgentInput) => {
     await db.insert(users).values({
         id: agentId,
         name: data.name,
-        phone: data.number,
+        phone: data.number.startsWith("+91")
+            ? data.number
+            : `+91${data.number}`,
         alternativePhone: data.alternativeNumber || null,
         role: UserRole.SERVICE_AGENT,
         isActive: true,
@@ -378,7 +380,7 @@ export const getAgentDashboard = async (agentId: string) => {
     }
 
 
-    console.log('data dashbaord ',data)
+    console.log('data dashbaord ', data)
 
     // Return in the same format as the original function would have
     return {
