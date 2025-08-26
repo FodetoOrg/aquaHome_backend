@@ -6,6 +6,7 @@ import {
   updateProduct,
   deleteProduct,
   uploadProductImage,
+  getAdminProductDetails,
 } from '../controllers/products.controller';
 import {
   getAllProductsSchema,
@@ -14,6 +15,7 @@ import {
   updateProductSchema,
   deleteProductSchema,
   uploadProductImageSchema,
+  getAdminProductDetailsSchema,
 } from '../schemas/products.schema';
 import { UserRole } from '../types';
 
@@ -21,7 +23,6 @@ export default async function (fastify: FastifyInstance) {
   // Public routes - no authentication required
   fastify.get('/', { schema: getAllProductsSchema }, getAllProducts);
   fastify.get('/:id', { schema: getProductByIdSchema }, getProductById);
-
 
   // Admin only routes
   fastify.post(
@@ -46,12 +47,21 @@ export default async function (fastify: FastifyInstance) {
   fastify.delete(
     '/:id',
     {
-      schema: deleteProductSchema,
+      // schema: deleteProductSchema,
       preHandler: [fastify.authorizeRoles([UserRole.ADMIN])],
     },
     async (request:FastifyRequest,reply:FastifyReply)=>deleteProduct(request as any,reply)
   );
 
+  // Admin product details - comprehensive information
+  fastify.get(
+    '/:id/admin-details',
+    {
+      schema: getAdminProductDetailsSchema,
+      preHandler: [fastify.authenticate, fastify.authorizeRoles([UserRole.ADMIN])],
+    },
+    async (request, reply) => getAdminProductDetails(request as any, reply as any)
+  );
  
   // Product image upload - admin only
   fastify.post(

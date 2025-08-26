@@ -96,6 +96,15 @@ export enum ActionType {
     NOTIFICATION_SENT = 'NOTIFICATION_SENT'
 }
 
+export enum FranchiseStatus {
+    ACTIVE = 'ACTIVE',
+    INACTIVE = 'INACTIVE',
+    SUSPENDED = 'SUSPENDED',
+    PENDING_APPROVAL = 'PENDING_APPROVAL',
+    APPROVED = 'APPROVED',
+    REJECTED = 'REJECTED'
+}
+
 export interface GeoLocation {
     latitude: number;
     longitude: number;

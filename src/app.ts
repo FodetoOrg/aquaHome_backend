@@ -18,7 +18,7 @@ import webhookRoutes from './routes/webhooks.routes';
 import viewAsRoutes from './routes/viewas.route';
 // Import routes
 import authRoutes from './routes/auth.route';
-// import userRoutes from './routes/user';
+import userRoutes from './routes/user.route';
 import productRoutes from './routes/products.routes';
 import serviceRequestRoutes from './routes/servicerequests.route';
 import installationRequestRoutes from './routes/installationrequests.route';
@@ -120,7 +120,7 @@ app.register(swaggerUi, {
 
 // Register routes
 app.register(authRoutes, { prefix: '/api/auth' });
-// app.register(userRoutes, { prefix: '/api/users' });
+app.register(userRoutes, { prefix: '/api/users' });
 app.register(productRoutes, { prefix: '/api/products' });
 app.register(categoryRoute, { prefix: '/api/categories' });
 // app.register(orderRoutes, { prefix: '/api/orders' });

@@ -550,7 +550,12 @@ export async function updateServiceRequestStatus(
         toStatus: status,
         agentId: data?.agentId,
         scheduledDate: data?.scheduledDate,
-        imagesCount: data?.images?.length || 0
+        imagesCount: data?.images?.length || 0,
+        notificationsSent: {
+          customer: true,
+          assignedAgent: !!serviceRequest.assignedToId,
+          franchiseOwner: true
+        }
       }
     });
 

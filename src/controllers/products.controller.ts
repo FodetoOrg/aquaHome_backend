@@ -155,26 +155,40 @@ export async function updateProduct(
 
 // Delete product (soft delete by setting isActive to false)
 export async function deleteProduct(
-  request: FastifyRequest<{ Params: { id: string },Body:{isActive:boolean} }>,
+  request: FastifyRequest<{ Params: { id: string } }>,
   reply: FastifyReply
 ) {
   try {
-    // Only admins can delete products
     if (request.user.role !== UserRole.ADMIN) {
       throw badRequest('Not authorized to delete products');
     }
 
     const { id } = request.params;
-    console.log('body ',request.body)
-    const {isActive} = request.body;
+    const result = await productService.deleteProduct(id);
+    return reply.code(200).send({ message: 'Product deleted successfully', result });
+  } catch (error) {
+    handleError(error, request, reply);
+  }
+}
 
-    console.log('id ',id)
-    await productService.updateProduct(id, { isActive });
+// Get comprehensive product details for admin
+export async function getAdminProductDetails(
+  request: FastifyRequest<{ Params: { id: string } }>,
+  reply: FastifyReply
+) {
+  try {
+    if (request.user.role !== UserRole.ADMIN) {
+      throw badRequest('Not authorized to access admin product details');
+    }
 
-    return reply.code(200).send({
-      message: 'Product deleted successfully',
-      id
-    });
+    const { id } = request.params;
+    const productDetails = await productService.getAdminProductDetails(id);
+
+    if (!productDetails) {
+      throw notFound('Product');
+    }
+
+    return reply.code(200).send(productDetails);
   } catch (error) {
     handleError(error, request, reply);
   }

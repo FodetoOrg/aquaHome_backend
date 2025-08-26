@@ -177,7 +177,14 @@ export async function getInstallationRequests(
         with: {
             product: true,
             franchise: true,
-            customer: true,
+            customer: {
+                columns: {
+                    id: true,
+                    name: true,
+                    phone: true,
+                    city: true
+                }
+            },
             assignedTechnician: {
                 columns: {
                     id: true,
@@ -222,7 +229,14 @@ export async function getInstallationRequestById(
         where: eq(installationRequests.id, requestId),
         with: {
             product: true,
-            customer: true,
+            customer: {
+                columns: {
+                    id: true,
+                    name: true,
+                    phone: true,
+                    city: true
+                }
+            },
             franchise: true,
             assignedTechnician: true,
         }

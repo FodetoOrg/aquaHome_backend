@@ -7,15 +7,17 @@ import {
   assignFranchiseOwner,
   assignServiceAgent,
   getServiceAgents,
+  uploadFranchiseDocument,
+  removeIdentityProofImage,
+  updateFranchiseStatus,
 } from '../controllers/franchise.controller'
 import {
   getAllFranchiseAreasSchema,
   getFranchiseAreaByIdSchema,
-  createFranchiseAreaSchema,
-  updateFranchiseAreaSchema,
   assignFranchiseOwnerSchema,
   assignServiceAgentSchema,
   getServiceAgentsSchema,
+  updateFranchiseStatusSchema,
 } from '../schemas/franchise.schema';
 import { UserRole } from '../types';
 
@@ -40,24 +42,40 @@ export default async function (fastify: FastifyInstance) {
     (request, reply) => getFranchiseAreaById(request as any, reply as any)
   );
 
-  // Create a new franchise area (admin only)
+  // Create a new franchise area (admin only) - No schema validation for multipart
   fastify.post(
     '/',
     {
-      schema: createFranchiseAreaSchema,
       preHandler: [fastify.authenticate, fastify.authorizeRoles([UserRole.ADMIN])],
     },
     (request,reply)=>createFranchiseArea(request as any,reply as any)
   );
 
-  // Update franchise area (admin only)
+  // Update franchise area (admin only) - No schema validation for multipart
   fastify.patch(
     '/:id',
     {
-      schema: updateFranchiseAreaSchema,
       preHandler: [fastify.authorizeRoles([UserRole.ADMIN])],
     },
     (request, reply) => updateFranchiseArea(request as any, reply as any)
+  );
+
+  // Upload franchise document (admin only)
+  fastify.post(
+    '/:id/upload/:documentType',
+    {
+      preHandler: [fastify.authorizeRoles([UserRole.ADMIN])],
+    },
+    (request, reply) => uploadFranchiseDocument(request as any, reply as any)
+  );
+
+  // Remove identity proof image (admin only)
+  fastify.delete(
+    '/:id/identity-proof/:imageIndex',
+    {
+      preHandler: [fastify.authorizeRoles([UserRole.ADMIN])],
+    },
+    (request, reply) => removeIdentityProofImage(request as any, reply as any)
   );
 
   // Assign franchise owner (admin only)
@@ -88,6 +106,16 @@ export default async function (fastify: FastifyInstance) {
       preHandler: [fastify.authenticate],
     },
     (request, reply) => getServiceAgents(request as any, reply as any)
+  );
+
+  // Update franchise status (admin only)
+  fastify.patch(
+    '/:id/status',
+    {
+      schema: updateFranchiseStatusSchema,
+      preHandler: [fastify.authenticate, fastify.authorizeRoles([UserRole.ADMIN])],
+    },
+    (request, reply) => updateFranchiseStatus(request as any, reply as any)
   );
 
   fastify.log.info('Franchise routes registered');

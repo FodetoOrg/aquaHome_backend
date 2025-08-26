@@ -4,6 +4,8 @@ import { franchises, installationRequests, subscriptions, User, users, serviceRe
 import { getFastifyInstance } from "../shared/fastify-instance";
 import { notFound, forbidden } from "../utils/errors";
 import { UserRole } from "../types";
+import { sql } from "drizzle-orm";
+import { count } from "drizzle-orm";
 
 // Frontend interfaces
 interface Payment {
@@ -325,4 +327,379 @@ export async function getUserDetails(userId: string, requestingUser: any): Promi
     installationRequests: formattedInstallations,
     serviceRequests: formattedServiceRequests
   };
+}
+
+export async function getAllCustomersForAdmin(filters?: {
+  search?: string;
+  city?: string;
+  status?: 'active' | 'inactive';
+  limit?: number;
+  offset?: number;
+}) {
+    const fastify = getFastifyInstance();
+    const db = fastify.db;
+
+    try {
+        let whereConditions: any[] = [sql`u.role = 'customer'`];
+        let searchCondition = sql``;
+        let limitClause = sql``;
+        let offsetClause = sql``;
+
+        // Add search filter
+        if (filters?.search) {
+            searchCondition = sql`AND (u.name LIKE ${`%${filters.search}%`} OR u.phone LIKE ${`%${filters.search}%`})`;
+        }
+
+        // Add city filter
+        if (filters?.city) {
+            whereConditions.push(sql`u.city = ${filters.city}`);
+        }
+
+        // Add status filter
+        if (filters?.status) {
+            const isActive = filters.status === 'active';
+            whereConditions.push(sql`u.is_active = ${isActive}`);
+        }
+
+        // Add pagination
+        if (filters?.limit) {
+            limitClause = sql`LIMIT ${filters.limit}`;
+        }
+
+        if (filters?.offset) {
+            offsetClause = sql`OFFSET ${filters.offset}`;
+        }
+
+        // Build the main query
+        let mainQuery = sql`
+            SELECT 
+                u.id,
+                u.name,
+                u.phone,
+                u.city,
+                u.created_at as joinedToPlatform,
+                u.is_active as status,
+                COALESCE(ir.install_request_count, 0) as totalInstallRequests,
+                COALESCE(s.subscription_count, 0) as subscriptionsCount,
+                COALESCE(sr.service_request_count, 0) as serviceRequestCount
+            FROM ${users} u
+            LEFT JOIN (
+                SELECT 
+                    customer_id,
+                    COUNT(*) as install_request_count
+                FROM ${installationRequests}
+                GROUP BY customer_id
+            ) ir ON u.id = ir.customer_id
+            LEFT JOIN (
+                SELECT 
+                    customer_id,
+                    COUNT(*) as subscription_count
+                FROM ${subscriptions}
+                GROUP BY customer_id
+            ) s ON u.id = s.customer_id
+            LEFT JOIN (
+                SELECT 
+                    customer_id,
+                    COUNT(*) as service_request_count
+                FROM ${serviceRequests}
+                GROUP BY customer_id
+            ) sr ON u.id = sr.customer_id
+            WHERE ${whereConditions[0]}
+        `;
+
+        // Add additional where conditions
+        for (let i = 1; i < whereConditions.length; i++) {
+            mainQuery = sql`${mainQuery} AND ${whereConditions[i]}`;
+        }
+
+        // Add search condition
+        if (searchCondition.sql) {
+            mainQuery = sql`${mainQuery} ${searchCondition}`;
+        }
+
+        // Add order by and pagination
+        mainQuery = sql`${mainQuery} ORDER BY u.created_at DESC ${limitClause} ${offsetClause}`;
+
+        // Get all customers with their basic info and statistics
+        const customers = await db.run(mainQuery).then(res => res.rows);
+
+        // Build the count query
+        let countQuery = sql`
+            SELECT COUNT(*) as total
+            FROM ${users} u
+            WHERE ${whereConditions[0]}
+        `;
+
+        // Add additional where conditions to count query
+        for (let i = 1; i < whereConditions.length; i++) {
+            countQuery = sql`${countQuery} AND ${whereConditions[i]}`;
+        }
+
+        // Add search condition to count query
+        if (searchCondition.sql) {
+            countQuery = sql`${countQuery} ${searchCondition}`;
+        }
+
+        // Get total count for pagination
+        const totalCountResult = await db.run(countQuery).then(res => res.rows[0]);
+
+        const totalCount = totalCountResult?.total || 0;
+
+        return {
+            customers: customers.map(customer => ({
+                id: customer.id,
+                name: customer.name || 'N/A',
+                phoneNumber: customer.phone,
+                status: customer.status ? 'Active' : 'Inactive',
+                totalInstallRequests: customer.totalInstallRequests,
+                subscriptionsCount: customer.subscriptionsCount,
+                serviceRequestCount: customer.serviceRequestCount,
+                joinedToPlatform: customer.joinedToPlatform,
+                city: customer.city || 'N/A'
+            })),
+            totalCount: totalCount,
+            pagination: {
+                limit: filters?.limit || null,
+                offset: filters?.offset || null,
+                hasMore: filters?.limit ? (filters.offset || 0) + (filters.limit || 0) < totalCount : false
+            }
+        };
+
+    } catch (error) {
+        console.error('Error fetching customers for admin:', error);
+        throw error;
+    }
+}
+
+export async function getProfileDetails(userId: string, userRole: string) {
+    const fastify = getFastifyInstance();
+    const db = fastify.db;
+
+    // Get basic user information
+    const user = await db.query.users.findFirst({
+        where: eq(users.id, userId)
+    });
+
+    if (!user) {
+        throw notFound('User');
+    }
+
+    const baseUserData = {
+        id: user.id,
+        name: user.name,
+        phone: user.phone,
+        alternativePhone: user.alternativePhone,
+        city: user.city,
+        role: user.role,
+        hasOnboarded: user.hasOnboarded,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt
+    };
+
+    // Return different profile data based on role
+    switch (userRole) {
+        case UserRole.ADMIN:
+            return {
+                user: baseUserData,
+                profile: await getAdminProfile(db)
+            };
+
+        case UserRole.FRANCHISE_OWNER:
+            return {
+                user: baseUserData,
+                profile: await getFranchiseOwnerProfile(db, userId)
+            };
+
+        case UserRole.SERVICE_AGENT:
+            return {
+                user: baseUserData,
+                profile: await getServiceAgentProfile(db, userId)
+            };
+
+        default:
+            return {
+                user: baseUserData,
+                profile: {
+                    type: 'CUSTOMER'
+                }
+            };
+    }
+}
+
+async function getAdminProfile(db: any) {
+    // Get admin statistics
+    const [
+        totalFranchises,
+        totalAgents,
+        totalCustomers,
+        totalRevenue
+    ] = await Promise.all([
+        db.select({ count: count() })
+        .from(franchises)
+        .where(eq(franchises.isActive, true)),
+
+        db.select({ count: count() })
+        .from(users)
+        .where(
+            and(
+                eq(users.role, 'SERVICE_AGENT'),
+                eq(users.isActive, true)
+            )
+        ),
+
+        db.select({ count: count() })
+        .from(users)
+        .where(
+            and(
+                eq(users.role, 'CUSTOMER'),
+                eq(users.isActive, true)
+            )
+        ),
+
+        db.select({ 
+            revenue: sql<number>`COALESCE(SUM(${payments.amount}), 0)` 
+        })
+        .from(payments)
+        .where(eq(payments.status, 'COMPLETED'))
+    ]);
+
+    return {
+        type: 'ADMIN',
+        totalFranchises: totalFranchises[0]?.count || 0,
+        totalAgents: totalAgents[0]?.count || 0,
+        totalCustomers: totalCustomers[0]?.count || 0,
+        totalRevenue: totalRevenue[0]?.revenue || 0,
+        permissions: [
+            'manage_franchises',
+            'manage_agents',
+            'view_all_data',
+            'manage_products',
+            'view_reports',
+            'manage_users'
+        ]
+    };
+}
+
+async function getFranchiseOwnerProfile(db: any, userId: string) {
+    // Get franchise information
+    const franchise = await db.query.franchises.findFirst({
+        where: eq(franchises.ownerId, userId)
+    });
+
+    if (!franchise) {
+        throw new Error('Franchise not found for this owner');
+    }
+
+    // Get franchise statistics
+    const [
+        totalAgents,
+        totalCustomers,
+        totalRevenue
+    ] = await Promise.all([
+        db.select({ count: count() })
+        .from(franchiseAgents)
+        .where(
+            and(
+                eq(franchiseAgents.franchiseId, franchise.id),
+                eq(franchiseAgents.isActive, true)
+            )
+        ),
+
+        db.select({ count: sql<number>`COUNT(DISTINCT ${installationRequests.customerId})` })
+        .from(installationRequests)
+        .where(eq(installationRequests.franchiseId, franchise.id)),
+
+        db.select({ 
+            revenue: sql<number>`COALESCE(SUM(${payments.amount}), 0)` 
+        })
+        .from(payments)
+        .innerJoin(installationRequests, eq(payments.installationRequestId, installationRequests.id))
+        .where(
+            and(
+                eq(payments.status, 'COMPLETED'),
+                eq(installationRequests.franchiseId, franchise.id)
+            )
+        )
+    ]);
+
+    return {
+        type: 'FRANCHISE_OWNER',
+        franchise: {
+            id: franchise.id,
+            name: franchise.name,
+            fullname: franchise.fullname,
+            city: franchise.city,
+            franchiseType: franchise.franchiseType,
+            isActive: franchise.isActive,
+            totalAgents: totalAgents[0]?.count || 0,
+            totalCustomers: totalCustomers[0]?.count || 0,
+            totalRevenue: totalRevenue[0]?.revenue || 0,
+            createdAt: franchise.createdAt
+        }
+    };
+}
+
+async function getServiceAgentProfile(db: any, userId: string) {
+    // Get franchise assignments
+    const assignments = await db.select({
+        franchiseId: franchiseAgents.franchiseId,
+        franchiseName: franchises.name,
+        franchiseCity: franchises.city,
+        isPrimary: franchiseAgents.isPrimary,
+        isActive: franchiseAgents.isActive,
+        assignedDate: franchiseAgents.assignedDate
+    })
+    .from(franchiseAgents)
+    .innerJoin(franchises, eq(franchiseAgents.franchiseId, franchises.id))
+    .where(
+        and(
+            eq(franchiseAgents.agentId, userId),
+            eq(franchiseAgents.isActive, true)
+        )
+    );
+
+    // Get agent statistics
+    const [
+        totalRequests,
+        completedRequests,
+        pendingRequests
+    ] = await Promise.all([
+        db.select({ count: count() })
+        .from(serviceRequests)
+        .where(eq(serviceRequests.assignedToId, userId)),
+
+        db.select({ count: count() })
+        .from(serviceRequests)
+        .where(
+            and(
+                eq(serviceRequests.assignedToId, userId),
+                eq(serviceRequests.status, 'COMPLETED')
+            )
+        ),
+
+        db.select({ count: count() })
+        .from(serviceRequests)
+        .where(
+            and(
+                eq(serviceRequests.assignedToId, userId),
+                sql`${serviceRequests.status} NOT IN ('COMPLETED', 'CANCELLED')`
+            )
+        )
+    ]);
+
+    const total = totalRequests[0]?.count || 0;
+    const completed = completedRequests[0]?.count || 0;
+    const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+    return {
+        type: 'SERVICE_AGENT',
+        assignments,
+        statistics: {
+            totalRequests: total,
+            completedRequests: completed,
+            pendingRequests: pendingRequests[0]?.count || 0,
+            completionRate
+        }
+    };
 }

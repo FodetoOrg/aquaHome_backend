@@ -176,7 +176,8 @@ async function getAdminDashboardData(db: any, fromDate: string, toDate: string) 
         .where(
             and(
                 eq(serviceRequests.status, ServiceRequestStatus.COMPLETED),
-                createDateCondition(serviceRequests.createdAt, fromDate, toDate)
+                sql`${serviceRequests.completedDate} IS NOT NULL`,
+                createDateCondition(serviceRequests.completedDate, fromDate, toDate)
             )
         ),
 
@@ -333,6 +334,21 @@ async function getAdminDashboardData(db: any, fromDate: string, toDate: string) 
         if (previous === 0) return current > 0 ? 0 : 0;
         return ((current - previous) / previous) * 100;
     };
+
+    // Log the raw data for debugging
+    console.log('Admin Dashboard Raw Data:', {
+        totalRevenue: totalRevenue[0]?.revenue,
+        previousRevenue: previousRevenue[0]?.revenue,
+        totalFranchises: totalFranchises[0]?.count,
+        totalInstallationRequests: totalInstallationRequests[0]?.count,
+        completedInstallationRequests: completedInstallationRequests[0]?.count,
+        totalServiceRequests: totalServiceRequests[0]?.count,
+        completedServiceRequests: completedServiceRequests[0]?.count,
+        totalCustomers: totalCustomers[0]?.count,
+        totalServiceAgents: totalServiceAgents[0]?.count,
+        totalSubscriptions: totalSubscriptions[0]?.count,
+        activeSubscriptions: activeSubscriptions[0]?.count
+    });
 
     return {
         dateFilter: { from: fromDate.split(' ')[0], to: toDate.split(' ')[0] },
@@ -523,7 +539,8 @@ async function getFranchiseDashboardData(db: any, franchiseOwnerId: string, from
             and(
                 eq(serviceRequests.franchiseId, franchise.id),
                 eq(serviceRequests.status, ServiceRequestStatus.COMPLETED),
-                createDateCondition(serviceRequests.createdAt, fromDate, toDate)
+                sql`${serviceRequests.completedDate} IS NOT NULL`,
+                createDateCondition(serviceRequests.completedDate, fromDate, toDate)
             )
         ),
 
@@ -753,7 +770,8 @@ async function getServiceAgentDashboardData(db: any, serviceAgentId: string, fro
         .where(
             and(
                 eq(serviceRequests.assignedToId, serviceAgentId),
-                sql`${serviceRequests.status} NOT IN ('COMPLETED', 'CANCELLED')`
+                sql`${serviceRequests.status} NOT IN ('COMPLETED', 'CANCELLED')`,
+                createDateCondition(serviceRequests.createdAt, fromDate, toDate)
             )
         ),
 
@@ -764,7 +782,8 @@ async function getServiceAgentDashboardData(db: any, serviceAgentId: string, fro
             and(
                 eq(serviceRequests.assignedToId, serviceAgentId),
                 eq(serviceRequests.status, ServiceRequestStatus.COMPLETED),
-                createDateCondition(serviceRequests.completedDate, fromDate, toDate)
+                // sql`${serviceRequests.completedDate} IS NOT NULL`,
+                createDateCondition(serviceRequests.createdAt, fromDate, toDate)
             )
         ),
 
@@ -775,6 +794,7 @@ async function getServiceAgentDashboardData(db: any, serviceAgentId: string, fro
             and(
                 eq(serviceRequests.assignedToId, serviceAgentId),
                 eq(serviceRequests.status, ServiceRequestStatus.COMPLETED),
+                sql`${serviceRequests.completedDate} IS NOT NULL`,
                 createDateCondition(serviceRequests.completedDate, comparisonFromDate, comparisonToDate)
             )
         ),
@@ -873,6 +893,7 @@ async function getServiceAgentDashboardData(db: any, serviceAgentId: string, fro
         and(
             eq(serviceRequests.assignedToId, serviceAgentId),
             eq(serviceRequests.status, ServiceRequestStatus.COMPLETED),
+            sql`${serviceRequests.completedDate} IS NOT NULL`,
             createDateCondition(serviceRequests.completedDate, fromDate, toDate)
         )
     )
@@ -883,6 +904,18 @@ async function getServiceAgentDashboardData(db: any, serviceAgentId: string, fro
         if (previous === 0) return current > 0 ? 0 : 0;
         return ((current - previous) / previous) * 100;
     };
+
+    // Log the raw data for debugging
+    console.log('Service Agent Dashboard Raw Data:', {
+        totalServiceRequests: totalServiceRequests[0]?.count,
+        assignedServiceRequests: assignedServiceRequests[0]?.count,
+        completedServiceRequests: completedServiceRequests[0]?.count,
+        scheduledServiceRequests: scheduledServiceRequests[0]?.count,
+        inProgressServiceRequests: inProgressServiceRequests[0]?.count,
+        nextScheduledRequests: nextScheduledRequests[0]?.count
+    });
+
+    console.log('Service Requests By Status:', serviceRequestsByStatus);
 
     return {
         dateFilter: { from: fromDate.split(' ')[0], to: toDate.split(' ')[0] },

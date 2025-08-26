@@ -68,6 +68,7 @@ export const addServiceAgent = async (request: FastifyRequest, reply: FastifyRep
 export const assignAgentToFranchisesController = async (request: FastifyRequest, reply: FastifyReply) => {
     try {
         const data = request.body as z.infer<typeof assignAgentBody>;
+        console.log('data in assign agent to franchises controller is ',data)
         const result = await assignAgentToFranchises(data.agentId, data.assignments);
 
         return reply.code(201).send({

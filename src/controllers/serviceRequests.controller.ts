@@ -500,3 +500,93 @@ export async function assignToMe(
     });
   }
 }
+
+// Enhanced notification system for status updates
+async function sendStatusUpdateNotifications(
+  serviceRequest: any,
+  newStatus: ServiceRequestStatus,
+  updatedBy: any
+) {
+  try {
+    const notifications = [];
+
+    // 1. Notify Customer
+    if (serviceRequest.customerId) {
+      const customer = await serviceRequestService.getUserById(serviceRequest.customerId);
+      if (customer?.pushNotificationToken) {
+        const customerNotification = {
+          pushToken: customer.pushNotificationToken,
+          title: getStatusUpdateTitle(newStatus, 'customer'),
+          message: getStatusUpdateMessage(newStatus, 'customer', serviceRequest.id),
+          data: {
+            serviceRequestId: serviceRequest.id,
+            type: 'STATUS_UPDATE',
+            status: newStatus,
+            screen: `/service-requests/${serviceRequest.id}`,
+            updatedBy: updatedBy.role
+          }
+        };
+        notifications.push(customerNotification);
+      }
+    }
+
+    // 2. Notify Assigned Agent (if any)
+    if (serviceRequest.assignedToId) {
+      const assignedAgent = await serviceRequestService.getUserById(serviceRequest.assignedToId);
+      if (assignedAgent?.pushNotificationToken) {
+        const agentNotification = {
+          pushToken: assignedAgent.pushNotificationToken,
+          title: getStatusUpdateTitle(newStatus, 'agent'),
+          message: getStatusUpdateMessage(newStatus, 'agent', serviceRequest.id),
+          data: {
+            serviceRequestId: serviceRequest.id,
+            type: 'STATUS_UPDATE',
+            status: newStatus,
+            screen: `/service-requests/${serviceRequest.id}`,
+            updatedBy: updatedBy.role
+          }
+        };
+        notifications.push(agentNotification);
+      }
+    }
+
+    // 3. Notify Franchise Owner
+    if (serviceRequest.franchiseId) {
+      const franchise = await serviceRequestService.getFranchiseById(serviceRequest.franchiseId);
+      if (franchise?.ownerId) {
+        const franchiseOwner = await serviceRequestService.getUserById(franchise.ownerId);
+        if (franchiseOwner?.pushNotificationToken) {
+          const franchiseNotification = {
+            pushToken: franchiseOwner.pushNotificationToken,
+            title: getStatusUpdateTitle(newStatus, 'franchise'),
+            message: getStatusUpdateMessage(newStatus, 'franchise', serviceRequest.id),
+            data: {
+              serviceRequestId: serviceRequest.id,
+              type: 'STATUS_UPDATE',
+              status: newStatus,
+              screen: `/service-requests/${serviceRequest.id}`,
+              updatedBy: updatedBy.role
+            }
+          };
+          notifications.push(franchiseNotification);
+        }
+      }
+    }
+
+    // Send all notifications
+    for (const notification of notifications) {
+      try {
+        await notificationService.sendSinglePushNotification(notification);
+        console.log(`Notification sent to ${notification.data?.updatedBy || 'user'}: ${notification.title}`);
+      } catch (error) {
+        console.error('Failed to send notification:', error);
+        // Continue with other notifications even if one fails
+      }
+    }
+
+    console.log(`Status update notifications sent: ${notifications.length} total`);
+  } catch (error) {
+    console.error('Error sending status update notifications:', error);
+    // Don't fail the main operation if notifications fail
+  }
+}

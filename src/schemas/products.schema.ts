@@ -98,6 +98,103 @@ export const DeleteProductParamsSchema = z.object({
 export const GetAllProductsResponseSchema = z.object({
     products: z.array(ProductSchema),
 });
+
+// Admin Product Details Schemas
+export const GetAdminProductDetailsParamsSchema = z.object({
+    id: z.string(),
+});
+
+export const InstallationRequestSummarySchema = z.object({
+    id: z.string(),
+    name: z.string(),
+    customerId: z.string(),
+    customerName: z.string().optional(),
+    orderType: z.string(),
+    status: z.string(),
+    franchiseName: z.string(),
+    franchiseId: z.string(),
+    connectId: z.string().optional(),
+    scheduledDate: z.string().optional(),
+    completedDate: z.string().optional(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    payAmount: z.number().optional(),
+    razorpayPaymentLink: z.string().optional(),
+});
+
+export const SubscriptionSummarySchema = z.object({
+    id: z.string(),
+    connectId: z.string(),
+    customerId: z.string(),
+    customerName: z.string().optional(),
+    franchiseId: z.string(),
+    franchiseName: z.string().optional(),
+    planName: z.string(),
+    status: z.string(),
+    startDate: z.string(),
+    endDate: z.string().optional(),
+    currentPeriodStartDate: z.string(),
+    currentPeriodEndDate: z.string(),
+    nextPaymentDate: z.string(),
+    monthlyAmount: z.number(),
+    depositAmount: z.number(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+});
+
+export const ServiceRequestSummarySchema = z.object({
+    id: z.string(),
+    type: z.string(),
+    description: z.string(),
+    status: z.string(),
+    customerId: z.string(),
+    customerName: z.string().optional(),
+    franchiseId: z.string(),
+    franchiseName: z.string().optional(),
+    assignedToId: z.string().optional(),
+    assignedToName: z.string().optional(),
+    scheduledDate: z.string().optional(),
+    completedDate: z.string().optional(),
+    requirePayment: z.boolean(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+});
+
+export const PaymentSummarySchema = z.object({
+    id: z.string(),
+    amount: z.number(),
+    type: z.string(),
+    status: z.string(),
+    paymentMethod: z.string(),
+    razorpayPaymentId: z.string().optional(),
+    createdAt: z.string(),
+});
+
+export const AdminProductDetailsResponseSchema = z.object({
+    product: ProductSchema,
+    statistics: z.object({
+        totalInstallationRequests: z.number(),
+        totalSubscriptions: z.number(),
+        totalServiceRequests: z.number(),
+        totalPayments: z.number(),
+        activeSubscriptions: z.number(),
+        completedInstallations: z.number(),
+        pendingInstallations: z.number(),
+        totalRevenue: z.number(),
+    }),
+    installationRequests: z.array(InstallationRequestSummarySchema),
+    subscriptions: z.array(SubscriptionSummarySchema),
+    serviceRequests: z.array(ServiceRequestSummarySchema),
+    payments: z.array(PaymentSummarySchema),
+    recentActivity: z.array(z.object({
+        type: z.string(),
+        id: z.string(),
+        description: z.string(),
+        timestamp: z.string(),
+        status: z.string(),
+    })),
+});
+
 export const GetProductByIdResponseSchema = z.object({
     product: ProductSchema,
 });
@@ -237,5 +334,17 @@ export const uploadProductImageSchema = {
     tags: ["products"],
     summary: "Upload product image",
     description: "Upload an image for a product (admin only)",
+    security: [{ bearerAuth: [] }],
+};
+
+export const getAdminProductDetailsSchema = {
+    params: zodToJsonSchema(GetAdminProductDetailsParamsSchema),
+    response: {
+        200: zodToJsonSchema(AdminProductDetailsResponseSchema),
+        404: zodToJsonSchema(ErrorResponseSchema),
+    },
+    tags: ["products"],
+    summary: "Get comprehensive product details for admin",
+    description: "Get detailed product information including installation requests, subscriptions, service requests, and payments (admin only)",
     security: [{ bearerAuth: [] }],
 };

@@ -61,13 +61,19 @@ export const razorpayPlans = sqliteTable('razorpay_plans', {
 export const franchises = sqliteTable("franchises", {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
+    fullname: text("fullname").notNull(), // Full name of franchise owner
     city: text("city").notNull(),
+    phonenumber: text("phonenumber"), // Phone number of franchise owner
+    gst_number: text("gst_number"), // GST number (optional)
+    gst_document: text("gst_document"), // GST document file path/URL
+    identity_proof: text("identity_proof", { mode: 'json' }).notNull(), // Identity proof documents (Aadhar/PAN) - array of image URLs
     geoPolygon: text("geo_polygon", { mode: 'json' }),
     ownerId: text("owner_id")
         .references(() => users.id, {
             onDelete: 'set null', // 👈 Set to NULL if user is deleted
         }),
     isCompanyManaged: integer("is_company_managed", { mode: "boolean" }).notNull().default(false),
+    franchiseType: text("franchise_type", { enum: ['BOUGHT', 'MANAGED', 'COMPANY_MANAGED'] }).notNull().default('COMPANY_MANAGED'), // New field to distinguish franchise types
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
     updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
     isActive: integer("is_active", { mode: "boolean" }).notNull().default(true)

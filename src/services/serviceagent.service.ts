@@ -162,21 +162,19 @@ export const serviceAgentUpdateInDB = async (id: string, data: {
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
 
     if (data.franchiseId) {
-        const frnachise = await db.query.franchises.findFirst({
+        const franchise = await db.query.franchises.findFirst({
             where: eq(franchises.id, data.franchiseId)
         })
 
-        if (!frnachise) {
-            throw notFound("Franchise ")
+        if (!franchise) {
+            throw notFound("Franchise not found")
         }
     }
-
 
     await db.transaction(async (tx) => {
 
         // Check if phone number is being updated and if it conflicts
         if (data.number) {
-
             if (data.number !== agent.phone) {
                 const existingAgent = await tx.query.users.findFirst({
                     where: and(
@@ -190,34 +188,56 @@ export const serviceAgentUpdateInDB = async (id: string, data: {
                 if (existingAgent && existingAgent.id !== id) {
                     throw new Error('Another service agent with this phone number already exists');
                 }
-                const rowToDelete = await tx.query.franchiseAgents.findFirst({
-                    where: eq(franchiseAgents.agentId, id),
-                });
-
-                if (rowToDelete) {
+                
+                // Handle franchise assignment when phone number changes
+                if (data.franchiseId) {
+                    // Delete existing franchise assignment for this specific agent
                     await tx.delete(franchiseAgents).where(eq(franchiseAgents.agentId, id));
+                    
+                    // Create new franchise assignment for this specific agent
+                    await tx.insert(franchiseAgents).values({
+                        id: uuidv4(),
+                        franchiseId: data.franchiseId,
+                        agentId: id,
+                        isActive: true,
+                        isPrimary: true
+                    });
                 }
-                await tx.insert(franchiseAgents).values({
-                    id: uuidv4(),
-                    franchiseId: data.franchiseId ? data.franchiseId : rowToDelete.franchiseId,
-                    agentId: id,
-
-                })
             }
 
-
             await tx.update(users).set(updateData).where(eq(users.id, id));
-
-
         }
 
+        // Handle franchise update separately (only for this specific agent)
         if (data.franchiseId) {
-            await tx.update(franchiseAgents).set({
-                franchiseId: data.franchiseId
-            })
-        }
+            // First, check if this agent already has a franchise assignment
+            const existingAssignment = await tx.query.franchiseAgents.findFirst({
+                where: eq(franchiseAgents.agentId, id)
+            });
 
-    })
+            if (existingAssignment) {
+                // Update existing assignment for this specific agent only
+                await tx.update(franchiseAgents)
+                    .set({
+                        franchiseId: data.franchiseId,
+                        updatedAt: sql`CURRENT_TIMESTAMP`
+                    })
+                    .where(and(
+                        eq(franchiseAgents.agentId, id),
+                        eq(franchiseAgents.id, existingAssignment.id)
+                    ));
+            } else {
+                // Create new franchise assignment for this specific agent
+                await tx.insert(franchiseAgents).values({
+                    id: uuidv4(),
+                    franchiseId: data.franchiseId,
+                    agentId: id,
+                    isActive: true,
+                    isPrimary: true
+                });
+            }
+        }
+    });
 
     // Return updated agent data
     const updatedAgent = await db.query.users.findFirst({

@@ -14,11 +14,10 @@ export const assignAgentBody = z.object({
 export const serviceAgentAddBody = z.object({
     name: z.string(),
     number: z.string(),
-    email: z.string().email().optional(),
-    address: z.string().optional(),
-    alternativeNumber: z.string().optional(),
+    email: z.string().email().nullable().optional(),
+    address: z.string().nullable().optional(),
+    alternativeNumber: z.string().nullable().optional(),
     franchiseId: z.string().optional()
-
 })
 
 

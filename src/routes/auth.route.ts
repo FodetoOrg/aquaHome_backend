@@ -2,6 +2,8 @@
 import { FastifyInstance } from "fastify";
 import { checkRoleSchema, loginSchema, meSchema, onboardUserSchema, refreshTokenSchema } from "../schemas/auth.schema";
 import { login, refreshToken,onboard,me, checkRole, registerPushToken, getUserDetails } from "../controllers/auth.controller";
+import { getAllCustomersForAdmin } from "../controllers/user.controller";
+import { getAllCustomersSchema } from "../schemas/user.schema";
 import { UserRole } from "../types";
 
 
@@ -86,6 +88,16 @@ export default async function (fastify: FastifyInstance) {
             }
         },
         (req,res)=>getUserDetails(req as any,res)
+    );
+
+    // Get all customers for admin
+    fastify.get(
+        '/admin/customers',
+        {
+            schema: getAllCustomersSchema,
+            preHandler: [fastify.authenticate, fastify.authorizeRoles([UserRole.ADMIN])],
+        },
+        (request, reply) => getAllCustomersForAdmin(request as any, reply as any)
     );
 
 

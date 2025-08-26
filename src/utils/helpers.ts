@@ -146,13 +146,37 @@ export function formatDate(date: Date): string {
 
 /**
  * Normalize polygon coordinates to ensure proper closure
- * @param coordinates Array of coordinate pairs
+ * @param coordinates Array of coordinate pairs or coordinate objects
  * @returns Normalized coordinates with proper closure
  */
-export function normalizePolygonCoordinates(coordinates: Array<{ latitude: number, longitude: number }>): Array<{ latitude: number, longitude: number }> {
+export function normalizePolygonCoordinates(coordinates: any): Array<{ latitude: number, longitude: number }> {
+  // Handle different input formats
+  if (!coordinates || !Array.isArray(coordinates)) {
+    throw new Error('Coordinates must be an array');
+  }
+  
   if (coordinates.length === 0) return coordinates;
 
-  const normalized = [...coordinates];
+  // Normalize coordinate format - handle both [lat, lng] arrays and {lat, lng} objects
+  const normalized = coordinates.map((coord: any) => {
+    if (Array.isArray(coord) && coord.length >= 2) {
+      // Format: [latitude, longitude]
+      return { latitude: Number(coord[0]), longitude: Number(coord[1]) };
+    } else if (coord && typeof coord === 'object' && coord.latitude !== undefined && coord.longitude !== undefined) {
+      // Format: { latitude, longitude }
+      return { latitude: Number(coord.latitude), longitude: Number(coord.longitude) };
+    } else {
+      throw new Error('Invalid coordinate format. Expected [lat, lng] or {lat, lng}');
+    }
+  });
+
+  // Validate that all coordinates are valid numbers
+  for (const coord of normalized) {
+    if (isNaN(coord.latitude) || isNaN(coord.longitude)) {
+      throw new Error('Invalid coordinate values. Latitude and longitude must be numbers');
+    }
+  }
+
   const firstPoint = normalized[0];
   const lastPoint = normalized[normalized.length - 1];
 
