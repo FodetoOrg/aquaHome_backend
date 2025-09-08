@@ -164,8 +164,13 @@ export async function createFranchiseArea(data: any) {
 
         // Check if phone number already exists for franchise owner (only if phone is needed)
         if (phonenumber && needsPhone) {
+            // Ensure phone number has +91 prefix for checking
+            const formattedPhoneCheck = phonenumber.startsWith("+91") 
+                ? phonenumber 
+                : `+91${phonenumber}`;
+                
             const existingUser = await db.query.users.findFirst({
-                where: and(eq(users.phone, phonenumber), eq(users.role, UserRole.FRANCHISE_OWNER))
+                where: and(eq(users.phone, formattedPhoneCheck), eq(users.role, UserRole.FRANCHISE_OWNER))
             });
 
             if (existingUser) {
@@ -186,9 +191,14 @@ export async function createFranchiseArea(data: any) {
             // Create franchise owner first if phone number provided and needed
             if (phonenumber && needsPhone) {
                 ownerId = uuidv4();
+                // Ensure phone number has +91 prefix
+                const formattedPhone = phonenumber.startsWith("+91") 
+                    ? phonenumber 
+                    : `+91${phonenumber}`;
+                    
                 await tx.insert(users).values({
                     id: ownerId,
-                    phone: phonenumber,
+                    phone: formattedPhone,
                     role: UserRole.FRANCHISE_OWNER,
                     createdAt: now,
                     updatedAt: now,
@@ -205,7 +215,7 @@ export async function createFranchiseArea(data: any) {
                     name,
                     fullname,
                     city,
-                    phonenumber: needsPhone ? phonenumber : null,
+                    phonenumber: needsPhone ? (phonenumber.startsWith("+91") ? phonenumber : `+91${phonenumber}`) : null,
                     gst_number: needsGst ? (gst_number || null) : null,
                     gst_document: needsGst ? (gst_document || null) : null,
                     identity_proof: needsIdentityProof ? identity_proof : [],
@@ -220,7 +230,7 @@ export async function createFranchiseArea(data: any) {
                     name,
                     fullname,
                     city,
-                    phonenumber: needsPhone ? phonenumber : null,
+                    phonenumber: needsPhone ? (phonenumber.startsWith("+91") ? phonenumber : `+91${phonenumber}`) : null,
                     gst_number: needsGst ? (gst_number || null) : null,
                     gst_document: needsGst ? (gst_document || null) : null,
                     identity_proof: needsIdentityProof ? identity_proof : [],
@@ -501,9 +511,14 @@ export async function updateFranchiseArea(id: string, data: any) {
                 await tx.delete(users).where(eq(users.id, area.ownerId));
             }
 
+            // Ensure phone number has +91 prefix
+            const formattedPhone = data.phonenumber.startsWith("+91") 
+                ? data.phonenumber 
+                : `+91${data.phonenumber}`;
+
             // Check if new phone number already exists
             const existingUser = await tx.query.users.findFirst({
-                where: and(eq(users.phone, data.phonenumber), eq(users.role, UserRole.FRANCHISE_OWNER))
+                where: and(eq(users.phone, formattedPhone), eq(users.role, UserRole.FRANCHISE_OWNER))
             });
 
             if (existingUser) {
@@ -513,7 +528,7 @@ export async function updateFranchiseArea(id: string, data: any) {
             const ownerId = uuidv4();
             await tx.insert(users).values({
                 id: ownerId,
-                phone: data.phonenumber,
+                phone: formattedPhone,
                 role: UserRole.FRANCHISE_OWNER,
                 createdAt: now,
                 updatedAt: now,
@@ -522,6 +537,7 @@ export async function updateFranchiseArea(id: string, data: any) {
             });
             updateData.ownerId = ownerId;
             updateData.isCompanyManaged = false;
+            updateData.phonenumber = formattedPhone; // Also update the phone number in franchises table
             
             // Handle GST fields based on franchise type
             if (data.franchiseType === 'BOUGHT') {
