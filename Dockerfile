@@ -12,7 +12,7 @@ RUN apt-get update -qq && apt-get install --no-install-recommends -y \
 
 # install deps (clean)
 COPY package*.json ./
-RUN npm ci
+RUN npm install --only=production
 
 # copy source & build
 COPY . .
